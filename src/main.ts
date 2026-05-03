@@ -36,12 +36,12 @@ async function bootstrap() {
   });
 
   const port = process.env.APP_PORT || 8080;
-  const localIp = process.env.LOCAL_IP!;
+  const ip = process.env.APP_IP!;
 
-  await app.listen(port, localIp);
+  await app.listen(port, ip);
 
-  console.log(`Server running on http://${localIp}:${port}/api/v1`);
-  console.log(`Swagger running on http://${localIp}:${port}/api/v1/docs`);
+  console.log(`Server running on http://${ip}:${port}/api/v1`);
+  console.log(`Swagger running on http://${ip}:${port}/api/v1/docs`);
 }
 
 bootstrap();
