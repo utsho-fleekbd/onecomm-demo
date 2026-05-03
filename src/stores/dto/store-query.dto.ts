@@ -3,7 +3,7 @@ import { StoreStatus } from "@prisma/client";
 import { IsEnum, IsOptional, IsString } from "class-validator";
 
 export class StoreQueryDto {
-  @ApiPropertyOptional({ example: "main" })
+  @ApiPropertyOptional({ example: "store" })
   @IsOptional()
   @IsString()
   declare search?: string;

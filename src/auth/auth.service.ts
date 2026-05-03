@@ -52,7 +52,7 @@ export class AuthService {
     });
 
     await this.storeService.create(user.id, {
-      name: "Neon Store",
+      name: "New Store",
     });
 
     const accessToken = await this.generateAccessToken({
