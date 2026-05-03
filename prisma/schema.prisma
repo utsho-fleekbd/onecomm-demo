@@ -11,3 +11,116 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum UserRole {
+  ADMIN
+  TENANT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum StoreStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+model User {
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+
+  role   UserRole   @default(TENANT)
+  status UserStatus @default(ACTIVE)
+
+  stores Store[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Store {
+  id     String @id @default(uuid())
+  userId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name    String
+  slug    String
+  phone   String?
+  address String?
+  status  StoreStatus @default(ACTIVE)
+
+  categories Category[]
+  products   Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@map("stores")
+}
+
+model Category {
+  id      String @id @default(uuid())
+  storeId String
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name     String
+  slug     String
+  parentId String?
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Product {
+  id         String  @id @default(uuid())
+  storeId    String
+  categoryId String?
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name        String
+  slug        String
+  sku         String?
+  description String?
+
+  price Decimal @db.Decimal(12, 2)
+
+  status ProductStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, slug])
+  @@unique([storeId, sku])
+  @@index([storeId])
+  @@index([categoryId])
+  @@map("products")
+}
