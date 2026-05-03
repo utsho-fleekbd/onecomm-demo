@@ -4,6 +4,7 @@ import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { StoresService } from "../stores/stores.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 
 const JWT_DEFAULT_EXPIRES_IN = "1d";
@@ -33,7 +34,7 @@ const JWT_DEFAULT_EXPIRES_IN = "1d";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, StoresService, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

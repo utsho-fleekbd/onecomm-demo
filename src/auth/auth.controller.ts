@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "./decorators/current_user.decorator";
-import type { CurrentUserPayload } from "./decorators/current_user.decorator";
+import { CurrentUser } from "./decorators/current-user.decorator";
+import type { CurrentUserPayload } from "./decorators/current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";

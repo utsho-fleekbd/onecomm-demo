@@ -10,12 +10,14 @@ import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { StoresService } from "../stores/stores.service";
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly storeService: StoresService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -47,6 +49,10 @@ export class AuthService {
         status: true,
         createdAt: true,
       },
+    });
+
+    await this.storeService.create(user.id, {
+      name: "Neon Store",
     });
 
     const accessToken = await this.generateAccessToken({
