@@ -11,11 +11,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserRole {
-  ADMIN
-  TENANT
-}
-
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -33,16 +28,36 @@ enum ProductStatus {
   DRAFT
 }
 
+enum PlatformRole {
+  ADMIN
+  USER
+}
+
+enum StoreMemberStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum ModuleAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+}
+
 model User {
   id       String @id @default(uuid())
   name     String
   email    String @unique
   password String
 
-  role   UserRole   @default(TENANT)
-  status UserStatus @default(ACTIVE)
+  role   PlatformRole @default(USER)
+  status UserStatus   @default(ACTIVE)
 
-  stores Store[]
+  ownedStores Store[]       @relation("StoreOwner")
+  memberships StoreMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -51,10 +66,10 @@ model User {
 }
 
 model Store {
-  id     String @id @default(uuid())
-  userId String
+  id      String @id @default(uuid())
+  ownerId String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner User @relation("StoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   name    String
   slug    String
@@ -62,15 +77,128 @@ model Store {
   address String?
   status  StoreStatus @default(ACTIVE)
 
+  roles      Role[]
+  members    StoreMember[]
   categories Category[]
   products   Product[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, slug])
-  @@index([userId])
+  @@unique([ownerId, slug])
+  @@index([ownerId])
   @@map("stores")
+}
+
+model StoreMember {
+  id String @id @default(uuid())
+
+  storeId String
+  userId  String
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status StoreMemberStatus @default(ACTIVE)
+
+  roles StoreMemberRole[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, userId])
+  @@unique([id, storeId])
+  @@index([userId])
+  @@index([storeId])
+  @@map("store_members")
+}
+
+model Role {
+  id String @id @default(uuid())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
+  members     StoreMemberRole[]
+  permissions RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, name])
+  @@unique([id, storeId])
+  @@index([storeId])
+  @@map("roles")
+}
+
+model StoreMemberRole {
+  storeMemberId String
+  roleId        String
+  storeId       String
+
+  storeMember StoreMember @relation(fields: [storeMemberId, storeId], references: [id, storeId], onDelete: Cascade)
+  role        Role        @relation(fields: [roleId, storeId], references: [id, storeId], onDelete: Cascade)
+
+  @@id([storeMemberId, roleId])
+  @@index([storeId])
+  @@index([roleId])
+  @@map("store_member_roles")
+}
+
+model Module {
+  id String @id @default(uuid())
+
+  name String @unique
+
+  permissions Permission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("modules")
+}
+
+model Permission {
+  id String @id @default(uuid())
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  action ModuleAction
+
+  /**
+   * Example:
+   * product:create
+   * product:read
+   * order:update
+   * employee:delete
+   */
+  key String @unique
+
+  roles RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([moduleId, action])
+  @@index([moduleId])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
 
 model Category {

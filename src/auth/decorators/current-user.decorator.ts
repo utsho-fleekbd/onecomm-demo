@@ -1,10 +1,11 @@
 import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { PlatformRole } from "@prisma/client";
 
 export type CurrentUserPayload = {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: PlatformRole;
   status: string;
 };
 

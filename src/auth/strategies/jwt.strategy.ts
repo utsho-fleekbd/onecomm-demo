@@ -1,14 +1,14 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
-import { UserStatus } from "@prisma/client";
+import { PlatformRole, UserStatus } from "@prisma/client";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { PrismaService } from "../../prisma/prisma.service";
 
 type JwtPayload = {
   sub: string;
   email: string;
-  role: string;
+  role: PlatformRole;
 };
 
 @Injectable()

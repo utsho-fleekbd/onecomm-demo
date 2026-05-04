@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { UserRole, UserStatus } from "@prisma/client";
+import { PlatformRole, UserStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginDto } from "./dto/login.dto";
@@ -38,7 +38,7 @@ export class AuthService {
         name: dto.name,
         email: dto.email,
         password: hashedPassword,
-        role: UserRole.TENANT,
+        role: PlatformRole.ADMIN,
         status: UserStatus.ACTIVE,
       },
       select: {
@@ -130,7 +130,7 @@ export class AuthService {
   private async generateAccessToken(user: {
     id: string;
     email: string;
-    role: UserRole;
+    role: PlatformRole;
   }) {
     return this.jwtService.signAsync({
       sub: user.id,

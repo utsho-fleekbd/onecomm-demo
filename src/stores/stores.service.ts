@@ -22,7 +22,7 @@ export class StoresService {
     try {
       return await this.prisma.store.create({
         data: {
-          userId,
+          ownerId: userId,
           name: dto.name,
           slug,
           phone: dto.phone,
@@ -37,7 +37,7 @@ export class StoresService {
 
   async findAll(userId: string, query: StoreQueryDto) {
     const where: Prisma.StoreWhereInput = {
-      userId,
+      ownerId: userId,
       ...(query.status && {
         status: query.status,
       }),
@@ -85,7 +85,7 @@ export class StoresService {
     const store = await this.prisma.store.findFirst({
       where: {
         id: storeId,
-        userId,
+        ownerId: userId,
       },
       include: {
         _count: {
@@ -152,7 +152,7 @@ export class StoresService {
     const store = await this.prisma.store.findFirst({
       where: {
         id: storeId,
-        userId,
+        ownerId: userId,
       },
       select: {
         id: true,
@@ -173,7 +173,7 @@ export class StoresService {
   ) {
     const existingStore = await this.prisma.store.findFirst({
       where: {
-        userId,
+        ownerId: userId,
         slug,
         ...(ignoreStoreId && {
           NOT: {
