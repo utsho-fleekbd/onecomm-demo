@@ -1,7 +1,12 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
-import { PlatformRole, UserStatus } from "@prisma/client";
+import {
+  PlatformRole,
+  StoreMemberStatus,
+  StoreStatus,
+  UserStatus,
+} from "@prisma/client";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -9,6 +14,8 @@ type JwtPayload = {
   sub: string;
   email: string;
   role: PlatformRole;
+  storeId?: string;
+  storeMemberId?: string | null;
 };
 
 @Injectable()
@@ -52,6 +59,101 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       throw new UnauthorizedException("Account is not active");
     }
 
-    return user;
+    /**
+     * This is allowed.
+     *
+     * It means the user is authenticated,
+     * but has not selected an active store yet.
+     *
+     * Useful for:
+     * POST /auth/select-store
+     * GET  /auth/me
+     */
+    if (!payload.storeId) {
+      return {
+        ...user,
+        storeId: null,
+        storeMemberId: null,
+        isStoreOwner: false,
+        permissions: [],
+      };
+    }
+
+    const store = await this.prisma.store.findFirst({
+      where: {
+        id: payload.storeId,
+        status: StoreStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        ownerId: true,
+      },
+    });
+
+    if (!store) {
+      throw new UnauthorizedException("Invalid store context");
+    }
+
+    /**
+     * Store owner always has access to own store.
+     */
+    if (store.ownerId === user.id) {
+      return {
+        ...user,
+        storeId: store.id,
+        storeMemberId: null,
+        isStoreOwner: true,
+        permissions: ["*"],
+      };
+    }
+
+    /**
+     * Normal store user/employee must have active StoreMember.
+     */
+    const storeMember = await this.prisma.storeMember.findFirst({
+      where: {
+        storeId: store.id,
+        userId: user.id,
+        status: StoreMemberStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        key: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!storeMember) {
+      throw new UnauthorizedException("You do not have access to this store");
+    }
+
+    const permissions = storeMember.roles.flatMap((memberRole) =>
+      memberRole.role.permissions.map(
+        (rolePermission) => rolePermission.permission.key,
+      ),
+    );
+
+    return {
+      ...user,
+      storeId: store.id,
+      storeMemberId: storeMember.id,
+      isStoreOwner: false,
+      permissions,
+    };
   }
 }

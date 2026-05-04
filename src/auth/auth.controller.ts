@@ -2,10 +2,11 @@ import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import type { CurrentUserPayload } from "./decorators/current-user.decorator";
-import { LoginDto } from "./dto/login.dto";
-import { RegisterDto } from "./dto/register.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { AuthService } from "./auth.service";
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
+import { SelectStoreDto } from "./dto/select-store.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -13,7 +14,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
-  @ApiOperation({ summary: "Register tenant account" })
+  @ApiOperation({ summary: "Register admin and create first store" })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -24,11 +25,22 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @Get("me")
-  @UseGuards(JwtAuthGuard)
+  @Post("select-store")
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Get logged-in user profile" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Select active store after login" })
+  selectStore(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: SelectStoreDto,
+  ) {
+    return this.authService.selectStore(user.id, dto.storeId);
+  }
+
+  @Get("me")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
-    return this.authService.me(user.id);
+    return this.authService.me(user.id, user.storeId);
   }
 }

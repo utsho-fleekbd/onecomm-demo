@@ -4,9 +4,10 @@ import { AuthModule } from "./auth/auth.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
-import { StoresModule } from './stores/stores.module';
-import { CategoriesModule } from './categories/categories.module';
-import { ProductsModule } from './products/products.module';
+import { StoresModule } from "./stores/stores.module";
+import { CategoriesModule } from "./categories/categories.module";
+import { ProductsModule } from "./products/products.module";
+import { UsersModule } from "./users/users.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ProductsModule } from './products/products.module';
     PrismaModule,
     AuthModule,
     StoresModule,
+    UsersModule,
     CategoriesModule,
     ProductsModule,
   ],

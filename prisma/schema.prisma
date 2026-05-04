@@ -170,13 +170,6 @@ model Permission {
 
   action ModuleAction
 
-  /**
-   * Example:
-   * product:create
-   * product:read
-   * order:update
-   * employee:delete
-   */
   key String @unique
 
   roles RolePermission[]
