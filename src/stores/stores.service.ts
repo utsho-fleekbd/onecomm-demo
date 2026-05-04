@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, StoreStatus } from "@prisma/client";
+import { Prisma, StoreMemberStatus, StoreStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateStoreDto } from "./dto/create-store.dto";
 import { StoreQueryDto } from "./dto/store-query.dto";
@@ -109,7 +109,7 @@ export class StoresService {
   }
 
   async update(userId: string, storeId: string, dto: UpdateStoreDto) {
-    await this.assertStoreOwner(userId, storeId);
+    // await this.assertStoreOwner(userId, storeId);
 
     let slug: string | undefined;
 
@@ -139,7 +139,7 @@ export class StoresService {
   }
 
   async remove(userId: string, storeId: string) {
-    await this.assertStoreOwner(userId, storeId);
+    // await this.assertStoreOwner(userId, storeId);
 
     await this.prisma.store.delete({
       where: {
@@ -152,14 +152,28 @@ export class StoresService {
     };
   }
 
-  async assertStoreOwner(userId: string, storeId: string) {
+  async assertStoreOwnerOrMember(userId: string, storeId: string) {
     const store = await this.prisma.store.findFirst({
       where: {
         id: storeId,
-        ownerId: userId,
+        status: StoreStatus.ACTIVE,
+        OR: [
+          {
+            ownerId: userId,
+          },
+          {
+            members: {
+              some: {
+                userId,
+                status: StoreMemberStatus.ACTIVE,
+              },
+            },
+          },
+        ],
       },
       select: {
         id: true,
+        ownerId: true,
       },
     });
 

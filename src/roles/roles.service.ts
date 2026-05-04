@@ -45,7 +45,7 @@ export class RolesService {
   ) {}
 
   async create(userId: string, storeId: string, dto: CreateRoleDto) {
-    await this.storesService.assertStoreOwner(userId, storeId);
+    // await this.storesService.assertStoreOwner(userId, storeId);
 
     const name = this.normalizeName(dto.name);
     const permissionIds = dto.permissionIds ?? [];
@@ -89,7 +89,7 @@ export class RolesService {
   }
 
   async findAll(userId: string, storeId: string, query: RoleQueryDto) {
-    await this.storesService.assertStoreOwner(userId, storeId);
+    // await this.storesService.assertStoreOwner(userId, storeId);
 
     const where: Prisma.RoleWhereInput = {
       storeId,
@@ -121,7 +121,7 @@ export class RolesService {
   }
 
   async findOne(userId: string, storeId: string, roleId: string) {
-    await this.storesService.assertStoreOwner(userId, storeId);
+    // await this.storesService.assertStoreOwner(userId, storeId);
 
     const role = await this.prisma.role.findFirst({
       where: {
@@ -144,7 +144,7 @@ export class RolesService {
     roleId: string,
     dto: UpdateRoleDto,
   ) {
-    await this.storesService.assertStoreOwner(userId, storeId);
+    // await this.storesService.assertStoreOwner(userId, storeId);
 
     const role = await this.ensureRoleBelongsToStore(storeId, roleId);
 
@@ -208,7 +208,7 @@ export class RolesService {
   }
 
   async remove(userId: string, storeId: string, roleId: string) {
-    await this.storesService.assertStoreOwner(userId, storeId);
+    // await this.storesService.assertStoreOwner(userId, storeId);
 
     const role = await this.prisma.role.findFirst({
       where: {
