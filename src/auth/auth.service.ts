@@ -111,11 +111,6 @@ export class AuthService {
       throw new ForbiddenException("You are not assigned to any store");
     }
 
-    /**
-     * Case 1:
-     * User has only one accessible store.
-     * Log him directly into that store.
-     */
     if (stores.length === 1) {
       const activeStore = stores[0];
 
@@ -136,12 +131,6 @@ export class AuthService {
       };
     }
 
-    /**
-     * Case 2:
-     * User has multiple stores.
-     * Return identity token first.
-     * Frontend should show store picker.
-     */
     const accessToken = await this.generateAccessToken({
       id: user.id,
       email: user.email,

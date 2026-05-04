@@ -8,6 +8,7 @@ import { StoresModule } from "./stores/stores.module";
 import { CategoriesModule } from "./categories/categories.module";
 import { ProductsModule } from "./products/products.module";
 import { UsersModule } from "./users/users.module";
+import { RolesModule } from "./roles/roles.module";
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { UsersModule } from "./users/users.module";
     AuthModule,
     StoresModule,
     UsersModule,
+    RolesModule,
     CategoriesModule,
     ProductsModule,
   ],

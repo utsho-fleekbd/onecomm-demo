@@ -73,6 +73,8 @@ export class StoresService {
       include: {
         _count: {
           select: {
+            roles: true,
+            members: true,
             products: true,
             categories: true,
           },
@@ -90,6 +92,8 @@ export class StoresService {
       include: {
         _count: {
           select: {
+            roles: true,
+            members: true,
             products: true,
             categories: true,
           },
