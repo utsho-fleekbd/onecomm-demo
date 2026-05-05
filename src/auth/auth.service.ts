@@ -105,11 +105,13 @@ export class AuthService {
       throw new ForbiddenException("Your account is inactive");
     }
 
-    const accessToken = await this.generateAccessToken({
+    let accessToken = await this.generateAccessToken({
       id: user.id,
       email: user.email,
       role: user.role,
     });
+    let activeStore: null | any = null;
+    let requiresStoreSelection = true;
 
     if (user.role === PlatformRole.SUPER_ADMIN) {
       return {
@@ -124,32 +126,35 @@ export class AuthService {
       }
 
       if (stores.length === 1) {
-        const activeStore = stores[0];
+        activeStore = stores[0];
 
-        const accessToken = await this.generateAccessToken({
+        accessToken = await this.generateAccessToken({
           id: user.id,
           email: user.email,
           role: user.role,
-          storeId: activeStore.id,
-          storeMemberId: activeStore.storeMemberId,
+          storeId: activeStore!.id,
+          storeMemberId: activeStore!.storeMemberId,
         });
 
+        requiresStoreSelection = false;
+      }
+
+      if (user.role === PlatformRole.ADMIN) {
         return {
           accessToken,
-          requiresStoreSelection: false,
+          requiresStoreSelection,
           activeStore,
           stores,
           user: this.sanitizeUser(user),
         };
+      } else {
+        return {
+          accessToken,
+          requiresStoreSelection,
+          activeStore,
+          user: this.sanitizeUser(user),
+        };
       }
-
-      return {
-        accessToken,
-        requiresStoreSelection: true,
-        activeStore: null,
-        stores,
-        user: this.sanitizeUser(user),
-      };
     }
   }
 
@@ -224,11 +229,18 @@ export class AuthService {
       ? (stores.find((store) => store.id === storeId) ?? null)
       : null;
 
-    return {
-      user,
-      activeStore,
-      stores,
-    };
+    if (user.role === PlatformRole.ADMIN) {
+      return {
+        user,
+        activeStore,
+        stores,
+      };
+    } else {
+      return {
+        user,
+        activeStore,
+      };
+    }
   }
 
   async getAdmins() {

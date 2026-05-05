@@ -17,11 +17,22 @@ export class PrismaService
 
     super({
       adapter,
+      log: [
+        { emit: "event", level: "query" },
+        { emit: "stdout", level: "error" },
+        { emit: "stdout", level: "warn" },
+      ],
     });
   }
 
   async onModuleInit() {
     await this.$connect();
+
+    this.$on("query" as never, (event: any) => {
+      console.log(
+        `[QUERY] \n\t\tduration: ${event.duration}ms \n\t\tquery: ${event.query} \n\t\tparams: ${event.params}`,
+      );
+    });
   }
 
   async onModuleDestroy() {

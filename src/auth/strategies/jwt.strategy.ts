@@ -24,23 +24,69 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     private readonly prisma: PrismaService,
     configService: ConfigService,
   ) {
-    const secret = configService.get<string>("JWT_ACCESS_SECRET");
-
-    if (!secret) {
-      throw new Error("JWT_ACCESS_SECRET is missing");
-    }
-
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: secret,
+      secretOrKey: configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
       ignoreExpiration: false,
     });
   }
 
   async validate(payload: JwtPayload) {
+    const userId = payload.sub;
+    const storeId = payload.storeId;
+
+    /**
+     * Case 1:
+     * User is authenticated, but no store is selected yet.
+     *
+     * Example:
+     * POST /auth/select-store
+     * GET  /auth/me
+     */
+    if (!storeId) {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+        },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException("Invalid token");
+      }
+
+      if (user.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException("Account is not active");
+      }
+
+      return {
+        ...user,
+        storeId: null,
+        storeMemberId: null,
+        isStoreOwner: false,
+        permissions: [],
+      };
+    }
+
+    /**
+     * Case 2:
+     * Store context exists.
+     *
+     * This single query checks:
+     * - user exists
+     * - user is active
+     * - user owns this active store, OR
+     * - user is an active member of this active store
+     */
     const user = await this.prisma.user.findUnique({
       where: {
-        id: payload.sub,
+        id: userId,
       },
       select: {
         id: true,
@@ -48,6 +94,49 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
         email: true,
         role: true,
         status: true,
+
+        ownedStores: {
+          where: {
+            id: storeId,
+            status: StoreStatus.ACTIVE,
+          },
+          select: {
+            id: true,
+          },
+          take: 1,
+        },
+
+        memberships: {
+          where: {
+            storeId,
+            status: StoreMemberStatus.ACTIVE,
+            store: {
+              status: StoreStatus.ACTIVE,
+            },
+          },
+          select: {
+            id: true,
+            storeId: true,
+            roles: {
+              select: {
+                role: {
+                  select: {
+                    permissions: {
+                      select: {
+                        permission: {
+                          select: {
+                            key: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          take: 1,
+        },
       },
     });
 
@@ -59,98 +148,48 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       throw new UnauthorizedException("Account is not active");
     }
 
-    /**
-     * This is allowed.
-     *
-     * It means the user is authenticated,
-     * but has not selected an active store yet.
-     *
-     * Useful for:
-     * POST /auth/select-store
-     * GET  /auth/me
-     */
-    if (!payload.storeId) {
-      return {
-        ...user,
-        storeId: null,
-        storeMemberId: null,
-        isStoreOwner: false,
-        permissions: [],
-      };
-    }
-
-    const store = await this.prisma.store.findFirst({
-      where: {
-        id: payload.storeId,
-        status: StoreStatus.ACTIVE,
-      },
-      select: {
-        id: true,
-        ownerId: true,
-      },
-    });
-
-    if (!store) {
-      throw new UnauthorizedException("Invalid store context");
-    }
+    const ownedStore = user.ownedStores[0];
 
     /**
-     * Store owner always has access to own store.
+     * Store owner always has full access.
      */
-    if (store.ownerId === user.id) {
+    if (ownedStore) {
       return {
-        ...user,
-        storeId: store.id,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        storeId: ownedStore.id,
         storeMemberId: null,
         isStoreOwner: true,
         permissions: ["*"],
       };
     }
 
-    /**
-     * Normal store user/employee must have active StoreMember.
-     */
-    const storeMember = await this.prisma.storeMember.findFirst({
-      where: {
-        storeId: store.id,
-        userId: user.id,
-        status: StoreMemberStatus.ACTIVE,
-      },
-      select: {
-        id: true,
-        roles: {
-          select: {
-            role: {
-              select: {
-                permissions: {
-                  select: {
-                    permission: {
-                      select: {
-                        key: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const storeMember = user.memberships[0];
 
     if (!storeMember) {
       throw new UnauthorizedException("You do not have access to this store");
     }
 
-    const permissions = storeMember.roles.flatMap((memberRole) =>
-      memberRole.role.permissions.map(
-        (rolePermission) => rolePermission.permission.key,
+    const permissions = [
+      ...new Set(
+        storeMember.roles.flatMap((memberRole) =>
+          memberRole.role.permissions.map(
+            (rolePermission) => rolePermission.permission.key,
+          ),
+        ),
       ),
-    );
+    ];
 
     return {
-      ...user,
-      storeId: store.id,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      storeId: storeMember.storeId,
       storeMemberId: storeMember.id,
       isStoreOwner: false,
       permissions,

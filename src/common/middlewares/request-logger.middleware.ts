@@ -19,7 +19,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
       const userAgent = req.get("user-agent") ?? "unknown";
 
       this.logger.log(
-        `${method} ${originalUrl} ${statusCode} - ${duration}ms - ${contentLength}b - ${ip} - ${userAgent}`,
+        `\n\t\t[${method}] - ${originalUrl} - ${statusCode} \n\t\tduration: ${duration}ms - content-length: ${contentLength}b \n\t\tip: ${ip} - user-agent: ${userAgent}`,
       );
     });
 
