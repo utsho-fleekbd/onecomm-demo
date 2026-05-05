@@ -151,6 +151,7 @@ export class UsersService {
       include: STORE_USER_INCLUDE,
     });
   }
+
   async findOne(currentUserId: string, storeId: string, userId: string) {
     // await this.storesService.assertStoreOwner(currentUserId, storeId);
 

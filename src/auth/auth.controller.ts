@@ -7,6 +7,7 @@ import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { SelectStoreDto } from "./dto/select-store.dto";
+import { SuperAdminGuard } from "./guards/super-admin.guard";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -42,5 +43,13 @@ export class AuthController {
   @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
     return this.authService.me(user.id, user.storeId);
+  }
+
+  @Get("admins")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiOperation({ summary: "Get all the platform admin" })
+  getAdmins() {
+    return this.authService.getAdmins();
   }
 }

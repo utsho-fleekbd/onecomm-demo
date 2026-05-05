@@ -29,6 +29,7 @@ enum ProductStatus {
 }
 
 enum PlatformRole {
+  SUPER_ADMIN
   ADMIN
   USER
 }

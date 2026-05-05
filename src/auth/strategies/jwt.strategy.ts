@@ -10,7 +10,7 @@ import {
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { PrismaService } from "../../prisma/prisma.service";
 
-type JwtPayload = {
+export type JwtPayload = {
   sub: string;
   email: string;
   role: PlatformRole;

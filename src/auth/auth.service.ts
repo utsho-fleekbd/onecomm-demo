@@ -105,45 +105,52 @@ export class AuthService {
       throw new ForbiddenException("Your account is inactive");
     }
 
-    const stores = await this.getAccessibleStores(user.id);
-
-    if (stores.length === 0) {
-      throw new ForbiddenException("You are not assigned to any store");
-    }
-
-    if (stores.length === 1) {
-      const activeStore = stores[0];
-
-      const accessToken = await this.generateAccessToken({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        storeId: activeStore.id,
-        storeMemberId: activeStore.storeMemberId,
-      });
-
-      return {
-        accessToken,
-        requiresStoreSelection: false,
-        activeStore,
-        stores,
-        user: this.sanitizeUser(user),
-      };
-    }
-
     const accessToken = await this.generateAccessToken({
       id: user.id,
       email: user.email,
       role: user.role,
     });
 
-    return {
-      accessToken,
-      requiresStoreSelection: true,
-      activeStore: null,
-      stores,
-      user: this.sanitizeUser(user),
-    };
+    if (user.role === PlatformRole.SUPER_ADMIN) {
+      return {
+        accessToken,
+        user: this.sanitizeUser(user),
+      };
+    } else {
+      const stores = await this.getAccessibleStores(user.id);
+
+      if (stores.length === 0) {
+        throw new ForbiddenException("You are not assigned to any store");
+      }
+
+      if (stores.length === 1) {
+        const activeStore = stores[0];
+
+        const accessToken = await this.generateAccessToken({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          storeId: activeStore.id,
+          storeMemberId: activeStore.storeMemberId,
+        });
+
+        return {
+          accessToken,
+          requiresStoreSelection: false,
+          activeStore,
+          stores,
+          user: this.sanitizeUser(user),
+        };
+      }
+
+      return {
+        accessToken,
+        requiresStoreSelection: true,
+        activeStore: null,
+        stores,
+        user: this.sanitizeUser(user),
+      };
+    }
   }
 
   async selectStore(userId: string, storeId: string) {
@@ -222,6 +229,20 @@ export class AuthService {
       activeStore,
       stores,
     };
+  }
+
+  async getAdmins() {
+    const admins = await this.prisma.user.findMany({
+      where: { role: PlatformRole.ADMIN },
+      omit: { password: true },
+      include: {
+        _count: {
+          select: { ownedStores: true, memberships: true },
+        },
+      },
+    });
+
+    return admins;
   }
 
   private async getAccessibleStores(userId: string) {
