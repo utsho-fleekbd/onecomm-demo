@@ -1,0 +1,12 @@
+enum BusinessStatus {
+    TRIAL
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+enum BusinessMemberStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}

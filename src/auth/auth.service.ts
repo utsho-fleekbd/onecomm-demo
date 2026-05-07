@@ -1,79 +1,78 @@
+import * as bcrypt from "bcryptjs";
+import { createHash, randomBytes } from "node:crypto";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { SystemUser, SystemUserStatus, SystemUserType } from "@prisma/client";
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import {
-  PlatformRole,
-  StoreMemberStatus,
-  StoreStatus,
-  UserStatus,
-} from "@prisma/client";
-import * as bcrypt from "bcryptjs";
-import { PrismaService } from "../prisma/prisma.service";
-import { StoresService } from "../stores/stores.service";
+
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { PrismaService } from "../prisma/prisma.service";
+import { BusinessService } from "../business/business.service";
+import { JwtPayload } from "./strategies/jwt.strategy";
+
+type SafeSystemUser = Omit<SystemUser, "passwordHash">;
+
+type AuthBusiness = {
+  id: number;
+  ownerUserId: number;
+  members: {
+    id: number;
+    userId: number;
+  }[];
+};
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly storeService: StoresService,
+    private readonly configService: ConfigService,
+    private readonly businessService: BusinessService,
   ) {}
 
   async register(dto: RegisterDto) {
     const email = this.normalizeEmail(dto.email);
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: {
-        email,
-      },
+    const existingUser = await this.prisma.systemUser.findUnique({
+      where: { email },
     });
 
     if (existingUser) {
       throw new BadRequestException("Email already exists");
     }
 
-    const hashedPassword = await this.hashPassword(dto.password);
+    const passwordHash = await this.hashPassword(dto.password);
 
-    const user = await this.prisma.user.create({
+    const user = await this.prisma.systemUser.create({
       data: {
         name: dto.name,
         email,
-        password: hashedPassword,
-        role: PlatformRole.ADMIN,
-        status: UserStatus.ACTIVE,
+        passwordHash,
+        type: SystemUserType.ADMIN,
       },
       select: {
         id: true,
         name: true,
         email: true,
-        role: true,
+        type: true,
         status: true,
         createdAt: true,
       },
     });
 
-    const store = await this.storeService.create(user.id, {
-      name: "New Store",
-    });
-
-    const accessToken = await this.generateAccessToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      storeId: store.id,
+    const business = await this.businessService.create(user.id, {
+      name: "Matrix",
     });
 
     return {
-      accessToken,
-      requiresStoreSelection: false,
-      activeStore: store,
+      selectedBusiness: business,
       user,
     };
   }
@@ -81,94 +80,186 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = this.normalizeEmail(dto.email);
 
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email,
-      },
+    const user = await this.prisma.systemUser.findUnique({
+      where: { email },
     });
 
     if (!user) {
       throw new UnauthorizedException("Invalid email or password");
     }
 
-    const isPasswordMatched = await bcrypt.compare(dto.password, user.password);
+    const isPasswordMatched = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
 
     if (!isPasswordMatched) {
       throw new UnauthorizedException("Invalid email or password");
     }
 
-    if (user.status === UserStatus.SUSPENDED) {
-      throw new ForbiddenException("Your account has been suspended");
-    }
+    this.assertActiveUser(user);
 
-    if (user.status === UserStatus.INACTIVE) {
-      throw new ForbiddenException("Your account is inactive");
-    }
+    const safeUser = this.toSafeUser(user);
 
-    let accessToken = await this.generateAccessToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
-    let activeStore: null | any = null;
-    let requiresStoreSelection = true;
+    if (user.type === SystemUserType.ADMIN) {
+      const tokens = await this.issueTokenPair({
+        sub: user.id,
+        type: user.type,
+        businessId: null,
+      });
 
-    if (user.role === PlatformRole.SUPER_ADMIN) {
       return {
-        accessToken,
-        user: this.sanitizeUser(user),
+        ...tokens,
+        selectedBusiness: null,
+        user: safeUser,
       };
-    } else {
-      const stores = await this.getAccessibleStores(user.id);
-
-      if (stores.length === 0) {
-        throw new ForbiddenException("You are not assigned to any store");
-      }
-
-      if (stores.length === 1) {
-        activeStore = stores[0];
-
-        accessToken = await this.generateAccessToken({
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          storeId: activeStore!.id,
-          storeMemberId: activeStore!.storeMemberId,
-        });
-
-        requiresStoreSelection = false;
-      }
-
-      if (user.role === PlatformRole.ADMIN) {
-        return {
-          accessToken,
-          requiresStoreSelection,
-          activeStore,
-          stores,
-          user: this.sanitizeUser(user),
-        };
-      } else {
-        return {
-          accessToken,
-          requiresStoreSelection,
-          activeStore,
-          user: this.sanitizeUser(user),
-        };
-      }
     }
-  }
 
-  async selectStore(userId: string, storeId: string) {
-    const user = await this.prisma.user.findUnique({
+    const businesses = await this.prisma.business.findMany({
       where: {
-        id: userId,
+        OR: [
+          {
+            ownerUserId: user.id,
+          },
+          {
+            members: {
+              some: {
+                userId: user.id,
+              },
+            },
+          },
+        ],
       },
       select: {
         id: true,
-        name: true,
-        email: true,
-        role: true,
-        status: true,
+        ownerUserId: true,
+        members: {
+          where: {
+            userId: user.id,
+          },
+          select: {
+            id: true,
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (businesses.length === 0) {
+      throw new ForbiddenException("You are not assigned to any business");
+    }
+
+    const selectedBusiness = businesses[0];
+
+    const tokens = await this.issueTokenPair({
+      sub: user.id,
+      type: user.type,
+      businessId: selectedBusiness.id,
+    });
+
+    if (user.type === SystemUserType.TENANT) {
+      return {
+        ...tokens,
+        selectedBusiness,
+        businesses,
+        user: safeUser,
+      };
+    }
+
+    return {
+      ...tokens,
+      selectedBusiness,
+      user: safeUser,
+    };
+  }
+
+  async refresh(dto: RefreshTokenDto) {
+    const refreshTokenHash = this.hashRefreshToken(dto.refreshToken);
+
+    const session = await this.prisma.systemSession.findUnique({
+      where: {
+        refreshTokenHash,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
+    if (session.revokedAt) {
+      throw new UnauthorizedException("Refresh token has been revoked");
+    }
+
+    if (session.expiresAt <= new Date()) {
+      throw new UnauthorizedException("Refresh token has expired");
+    }
+
+    const user = session.user;
+
+    this.assertActiveUser(user);
+
+    let businessId: number | null = null;
+    let selectedBusiness: AuthBusiness | null = null;
+
+    if (dto.businessId) {
+      selectedBusiness = await this.findAccessibleBusiness(
+        user.id,
+        dto.businessId,
+      );
+
+      if (!selectedBusiness) {
+        throw new ForbiddenException("You do not have access to this business");
+      }
+
+      businessId = selectedBusiness.id;
+    }
+
+    const accessToken = await this.generateAccessToken({
+      sub: user.id,
+      type: user.type,
+      businessId,
+    });
+
+    const newRefreshToken = this.generateRefreshToken();
+    const newRefreshTokenHash = this.hashRefreshToken(newRefreshToken);
+
+    await this.prisma.$transaction([
+      this.prisma.systemSession.update({
+        where: {
+          id: session.id,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      }),
+
+      this.prisma.systemSession.create({
+        data: {
+          userId: user.id,
+          refreshTokenHash: newRefreshTokenHash,
+          expiresAt: this.getRefreshTokenExpiresAt(),
+        },
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      selectedBusiness,
+      user: this.toSafeUser(user),
+    };
+  }
+
+  async selectStore(userId: number, businessId: number) {
+    const user = await this.prisma.systemUser.findUnique({
+      where: {
+        id: userId,
+      },
+      omit: {
+        passwordHash: true,
       },
     });
 
@@ -176,224 +267,201 @@ export class AuthService {
       throw new UnauthorizedException("Invalid authenticated user");
     }
 
-    if (user.status !== UserStatus.ACTIVE) {
+    if (user.status !== SystemUserStatus.ACTIVE) {
       throw new ForbiddenException("User account is not active");
     }
 
-    const stores = await this.getAccessibleStores(user.id);
+    const business = await this.findAccessibleBusiness(userId, businessId);
 
-    const selectedStore = stores.find((store) => store.id === storeId);
-
-    if (!selectedStore) {
-      throw new ForbiddenException("You do not have access to this store");
+    if (!business) {
+      throw new ForbiddenException("You do not have access to this business");
     }
 
     const accessToken = await this.generateAccessToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      storeId: selectedStore.id,
-      storeMemberId: selectedStore.storeMemberId,
+      sub: user.id,
+      type: user.type,
+      businessId: business.id,
     });
 
     return {
       accessToken,
-      activeStore: selectedStore,
+      selectedBusiness: business,
       user,
     };
   }
 
-  async me(userId: string, storeId: string | null) {
-    const user = await this.prisma.user.findUnique({
+  async me(userId: number, businessId: number | null) {
+    const user = await this.prisma.systemUser.findUnique({
       where: {
         id: userId,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
+      omit: {
+        passwordHash: true,
       },
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new UnauthorizedException("Invalid authenticated user");
     }
 
-    const stores = await this.getAccessibleStores(userId);
-
-    const activeStore = storeId
-      ? (stores.find((store) => store.id === storeId) ?? null)
-      : null;
-
-    if (user.role === PlatformRole.ADMIN) {
-      return {
-        user,
-        activeStore,
-        stores,
-      };
-    } else {
-      return {
-        user,
-        activeStore,
-      };
-    }
-  }
-
-  async getAdmins() {
-    const admins = await this.prisma.user.findMany({
-      where: { role: PlatformRole.ADMIN },
-      omit: { password: true },
-      include: {
-        _count: {
-          select: { ownedStores: true, memberships: true },
+    const businesses = await this.prisma.business.findMany({
+      where: {
+        OR: [
+          {
+            ownerUserId: userId,
+          },
+          {
+            members: {
+              some: {
+                userId,
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        ownerUserId: true,
+        members: {
+          where: {
+            userId,
+          },
+          select: {
+            id: true,
+            userId: true,
+          },
         },
       },
     });
 
-    return admins;
-  }
+    let selectedBusiness: AuthBusiness | null = null;
 
-  private async getAccessibleStores(userId: string) {
-    const [ownedStores, memberships] = await Promise.all([
-      this.prisma.store.findMany({
-        where: {
-          ownerId: userId,
-          status: StoreStatus.ACTIVE,
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          status: true,
-          createdAt: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
-
-      this.prisma.storeMember.findMany({
-        where: {
-          userId,
-          status: StoreMemberStatus.ACTIVE,
-          store: {
-            status: StoreStatus.ACTIVE,
-          },
-        },
-        select: {
-          id: true,
-          status: true,
-          store: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              status: true,
-              createdAt: true,
-            },
-          },
-          roles: {
-            select: {
-              role: {
-                select: {
-                  id: true,
-                  name: true,
-                  permissions: {
-                    select: {
-                      permission: {
-                        select: {
-                          id: true,
-                          key: true,
-                          action: true,
-                          module: {
-                            select: {
-                              id: true,
-                              name: true,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
-    ]);
-
-    const storeMap = new Map<string, any>();
-
-    for (const store of ownedStores) {
-      storeMap.set(store.id, {
-        ...store,
-        storeMemberId: null,
-        isOwner: true,
-        roles: [],
-        permissions: [],
-      });
+    if (businessId) {
+      selectedBusiness = await this.findAccessibleBusiness(userId, businessId);
     }
 
-    for (const membership of memberships) {
-      const permissions = membership.roles.flatMap((memberRole) =>
-        memberRole.role.permissions.map((rolePermission) => ({
-          id: rolePermission.permission.id,
-          key: rolePermission.permission.key,
-          action: rolePermission.permission.action,
-          module: rolePermission.permission.module,
-        })),
-      );
-
-      storeMap.set(membership.store.id, {
-        ...membership.store,
-        storeMemberId: membership.id,
-        isOwner: storeMap.get(membership.store.id)?.isOwner ?? false,
-        roles: membership.roles.map((memberRole) => memberRole.role),
-        permissions,
-      });
+    if (user.type === SystemUserType.TENANT) {
+      return {
+        user,
+        selectedBusiness,
+        businesses,
+      };
     }
 
-    return Array.from(storeMap.values());
+    return {
+      user,
+      selectedBusiness,
+    };
   }
 
-  private async generateAccessToken(user: {
-    id: string;
-    email: string;
-    role: PlatformRole;
-    storeId?: string;
-    storeMemberId?: string | null;
-  }) {
-    return this.jwtService.signAsync({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      storeId: user.storeId,
-      storeMemberId: user.storeMemberId,
+  async getTenants() {
+    return this.prisma.systemUser.findMany({
+      where: { type: SystemUserType.TENANT },
+      omit: { passwordHash: true },
+      include: {
+        _count: {
+          select: { ownedBusinesses: true, memberships: true },
+        },
+      },
     });
   }
 
-  private sanitizeUser(user: {
-    id: string;
-    name: string;
-    email: string;
-    role: PlatformRole;
-    status: UserStatus;
-  }) {
+  private async issueTokenPair(payload: JwtPayload) {
+    const accessToken = await this.generateAccessToken(payload);
+    const refreshToken = this.generateRefreshToken();
+
+    await this.prisma.systemSession.create({
+      data: {
+        userId: payload.sub,
+        refreshTokenHash: this.hashRefreshToken(refreshToken),
+        expiresAt: this.getRefreshTokenExpiresAt(),
+      },
+    });
+
     return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
+      accessToken,
+      refreshToken,
     };
+  }
+
+  private async generateAccessToken(payload: JwtPayload) {
+    return this.jwtService.signAsync(payload, {
+      secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
+    });
+  }
+
+  private generateRefreshToken() {
+    return randomBytes(64).toString("hex");
+  }
+
+  private hashRefreshToken(refreshToken: string) {
+    return createHash("sha256").update(refreshToken).digest("hex");
+  }
+
+  private getRefreshTokenExpiresAt() {
+    const days =
+      Number(this.configService.get<string>("JWT_REFRESH_EXPIRES_IN_DAYS")) ||
+      30;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + days);
+
+    return expiresAt;
+  }
+
+  private async findAccessibleBusiness(
+    userId: number,
+    businessId: number,
+  ): Promise<AuthBusiness | null> {
+    return this.prisma.business.findFirst({
+      where: {
+        id: businessId,
+        OR: [
+          {
+            ownerUserId: userId,
+          },
+          {
+            members: {
+              some: {
+                userId,
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        ownerUserId: true,
+        members: {
+          where: {
+            userId,
+          },
+          select: {
+            id: true,
+            userId: true,
+          },
+        },
+      },
+    });
+  }
+
+  private assertActiveUser(user: Pick<SystemUser, "status">) {
+    if (user.status === SystemUserStatus.SUSPENDED) {
+      throw new ForbiddenException("Your account has been suspended");
+    }
+
+    if (user.status === SystemUserStatus.INACTIVE) {
+      throw new ForbiddenException("Your account is inactive");
+    }
+
+    if (user.status !== SystemUserStatus.ACTIVE) {
+      throw new ForbiddenException("User account is not active");
+    }
+  }
+
+  private toSafeUser(user: SystemUser): SafeSystemUser {
+    const { passwordHash, ...safeUser } = user;
+    return safeUser;
   }
 
   private normalizeEmail(email: string) {

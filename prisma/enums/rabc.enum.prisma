@@ -1,0 +1,27 @@
+enum RbacFeature {
+    BUSINESS_PROFILE
+    BUSINESS_SETTINGS
+    BUSINESS_BRANDING
+
+    EMPLOYEE_MANAGEMENT
+    ROLE_MANAGEMENT
+}
+
+enum PermissionAction {
+    CREATE
+    READ
+    UPDATE
+    DELETE
+}
+
+enum CommonStatus {
+    ACTIVE
+    INACTIVE
+}
+
+enum UserRoleMapStatus {
+    ACTIVE
+    INACTIVE
+    EXPIRED
+    REVOKED
+}

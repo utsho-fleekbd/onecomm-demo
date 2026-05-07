@@ -2,7 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsUUID } from "class-validator";
 
 export class SelectStoreDto {
-  @ApiProperty({ example: "store-uuid" })
+  @ApiProperty({ example: "business-id" })
   @IsUUID()
-  declare storeId: string;
+  declare businessId: number;
 }

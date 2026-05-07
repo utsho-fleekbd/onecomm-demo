@@ -6,8 +6,9 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
-import { SelectStoreDto } from "./dto/select-store.dto";
-import { SuperAdminGuard } from "./guards/super-admin.guard";
+import { SelectStoreDto } from "./dto/select-business.dto";
+import { RequireAdmin } from "./guards/require-admin";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -26,6 +27,14 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post("refresh")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Refresh the current access token" })
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto);
+  }
+
   @Post("select-store")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -34,7 +43,7 @@ export class AuthController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: SelectStoreDto,
   ) {
-    return this.authService.selectStore(user.id, dto.storeId);
+    return this.authService.selectStore(user.id, dto.businessId);
   }
 
   @Get("me")
@@ -42,14 +51,14 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
-    return this.authService.me(user.id, user.storeId);
+    return this.authService.me(user.id, user.businessId);
   }
 
   @Get("admins")
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, SuperAdminGuard)
-  @ApiOperation({ summary: "Get all the platform admin" })
-  getAdmins() {
-    return this.authService.getAdmins();
+  @UseGuards(JwtAuthGuard, RequireAdmin)
+  @ApiOperation({ summary: "Get all tenants" })
+  getTenants() {
+    return this.authService.getTenants();
   }
 }

@@ -1,13 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsOptional, IsString, MaxLength } from "class-validator";
 
-export class CreateStoreDto {
-  @ApiProperty({ example: "Neon Store" })
+export class CreateBusinessDto {
+  @ApiProperty({ example: "Matrix" })
   @IsString()
   @MaxLength(100)
   declare name: string;
 
-  @ApiPropertyOptional({ example: "neon-store" })
+  @ApiPropertyOptional({ example: "matrix" })
   @IsOptional()
   @IsString()
   @MaxLength(120)

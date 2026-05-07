@@ -1,0 +1,149 @@
+model SystemUser {
+    id              Int              @id @default(autoincrement())
+    uuid            String           @unique @default(uuid()) @db.Uuid
+    name            String           @db.VarChar(150)
+    email           String           @unique @db.VarChar(255)
+    phone           String?          @unique @db.VarChar(30)
+    passwordHash    String           @map("password_hash") @db.Text
+    type            SystemUserType  
+    status          SystemUserStatus @default(ACTIVE)
+    emailVerifiedAt DateTime?        @map("email_verified_at") @db.Timestamptz(6)
+
+    createdById Int? @map("created_by")
+    updatedById Int? @map("updated_by")
+    deletedById Int? @map("deleted_by")
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+    createdBy SystemUser? @relation("SystemUserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy SystemUser? @relation("SystemUserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+    deletedBy SystemUser? @relation("SystemUserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
+    usersCreated SystemUser[] @relation("SystemUserCreatedBy")
+    usersUpdated SystemUser[] @relation("SystemUserUpdatedBy")
+    usersDeleted SystemUser[] @relation("SystemUserDeletedBy")
+
+    profile            SystemUserProfile?
+    emailVerifications SystemEmailVerification[]
+    passwordResets     SystemPasswordReset[]
+    sessions           SystemSession[]
+    auditLogs          SystemAuditLog[]
+
+    ownedBusinesses   Business[] @relation("BusinessOwner")
+    createdBusinesses Business[] @relation("BusinessCreatedBy")
+    updatedBusinesses Business[] @relation("BusinessUpdatedBy")
+    businessMembers   BusinessMember[]
+
+    createdRoles RbacRole[] @relation("RbacRoleCreatedBy")
+    updatedRoles RbacRole[] @relation("RbacRoleUpdatedBy")
+
+    userRoleMaps     RbacUserRoleMap[] @relation("UserRoleMapUser")
+    assignedRoleMaps RbacUserRoleMap[] @relation("UserRoleMapAssignedBy")
+
+    @@index([type])
+    @@index([status])
+    @@index([deletedAt])
+    @@map("system_users")
+}
+
+model SystemUserProfile {
+    id          Int       @id @default(autoincrement())
+    userId      Int       @unique @map("user_id")
+    firstName   String?   @map("first_name") @db.VarChar(100)
+    lastName    String?   @map("last_name") @db.VarChar(100)
+    imageUrl    String?   @map("image_url") @db.Text
+    dateOfBirth DateTime? @map("date_of_birth") @db.Date
+    gender      Gender?
+    address     String?   @db.Text
+    city        String?   @db.VarChar(100)
+    country     String?   @db.VarChar(100)
+    bio         String?   @db.Text
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+    user SystemUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([deletedAt])
+    @@map("system_user_profiles")
+}
+
+model SystemEmailVerification {
+    id           Int        @id @default(autoincrement())
+    userId       Int        @map("user_id")
+    otpHash      String     @map("otp_hash") @db.Text
+    purpose      OtpPurpose
+    attemptCount Int        @default(0) @map("attempt_count")
+    expiresAt    DateTime   @map("expires_at") @db.Timestamptz(6)
+    verifiedAt   DateTime?  @map("verified_at") @db.Timestamptz(6)
+    createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    user SystemUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([purpose])
+    @@index([expiresAt])
+    @@map("system_email_verifications")
+}
+
+model SystemPasswordReset {
+    id           Int       @id @default(autoincrement())
+    userId       Int       @map("user_id")
+    otpHash      String    @map("otp_hash") @db.Text
+    attemptCount Int       @default(0) @map("attempt_count")
+    expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+    usedAt       DateTime? @map("used_at") @db.Timestamptz(6)
+    createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    user SystemUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([expiresAt])
+    @@map("system_password_resets")
+}
+
+model SystemSession {
+    id               Int       @id @default(autoincrement())
+    userId           Int       @map("user_id")
+    refreshTokenHash String    @unique @map("refresh_token_hash") @db.Text
+    expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+    revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    user SystemUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([expiresAt])
+    @@index([revokedAt])
+    @@map("system_sessions")
+}
+
+model SystemAuditLog {
+    id         Int      @id @default(autoincrement())
+    userId     Int?     @map("user_id")
+    businessId Int?     @map("business_id")
+    action     String   @db.VarChar(100)
+    feature    String   @db.VarChar(100)
+    entityName String   @map("entity_name") @db.VarChar(150)
+    entityId   String?  @map("entity_id") @db.VarChar(100)
+    oldData    Json?    @map("old_data")
+    newData    Json?    @map("new_data")
+    ipAddress  String?  @map("ip_address") @db.VarChar(100)
+    userAgent  String?  @map("user_agent") @db.Text
+    createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    user     SystemUser?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+    business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+    @@index([userId])
+    @@index([businessId])
+    @@index([feature])
+    @@index([entityName, entityId])
+    @@index([createdAt])
+    @@map("system_audit_logs")
+}

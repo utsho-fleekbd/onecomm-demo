@@ -1,0 +1,22 @@
+enum SystemUserType {
+    ADMIN
+    TENANT
+    EMPLOYEE
+}
+
+enum SystemUserStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+enum Gender {
+    MALE
+    FEMALE
+    OTHER
+}
+
+enum OtpPurpose {
+    EMAIL_VERIFICATION
+    EMAIL_CHANGE
+}

@@ -1,0 +1,69 @@
+model RbacRole {
+    id          Int          @id @default(autoincrement())
+    businessId  Int          @map("business_id")
+    name        String       @db.VarChar(100)
+    description String?      @db.Text
+    status      CommonStatus @default(ACTIVE)
+
+    createdById Int? @map("created_by")
+    updatedById Int? @map("updated_by")
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+    business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+    createdBy SystemUser?      @relation("RbacRoleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy SystemUser?      @relation("RbacRoleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+    permissions  RbacRolePermission[]
+    userRoleMaps RbacUserRoleMap[]
+
+    @@unique([businessId, name])
+    @@index([businessId])
+    @@index([status])
+    @@index([deletedAt])
+    @@map("rbac_roles")
+}
+
+model RbacRolePermission {
+    id      Int              @id @default(autoincrement())
+    roleId  Int              @map("role_id")
+    feature RbacFeature
+    action  PermissionAction
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    role RbacRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+    @@unique([roleId, feature, action])
+    @@index([roleId])
+    @@index([feature])
+    @@index([action])
+    @@map("rbac_role_permissions")
+}
+
+model RbacUserRoleMap {
+    id         Int               @id @default(autoincrement())
+    userId     Int               @map("user_id")
+    roleId     Int               @map("role_id")
+    status     UserRoleMapStatus @default(ACTIVE)
+    assignedBy Int?              @map("assigned_by")
+    assignedAt DateTime          @default(now()) @map("assigned_at") @db.Timestamptz(6)
+    expiresAt  DateTime?         @map("expires_at") @db.Timestamptz(6)
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    user           SystemUser  @relation("UserRoleMapUser", fields: [userId], references: [id], onDelete: Cascade)
+    role           RbacRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    assignedByUser SystemUser? @relation("UserRoleMapAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+    @@unique([userId, roleId])
+    @@index([userId])
+    @@index([roleId])
+    @@index([status])
+    @@index([expiresAt])
+    @@map("rbac_user_role_map")
+}

@@ -1,33 +1,33 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, StoreMemberStatus, StoreStatus } from "@prisma/client";
+import { BusinessStatus, Prisma } from "@prisma/client";
+
 import { PrismaService } from "../prisma/prisma.service";
-import { CreateStoreDto } from "./dto/create-store.dto";
-import { StoreQueryDto } from "./dto/store-query.dto";
-import { UpdateStoreDto } from "./dto/update-store.dto";
+import { QueryBusinessDto } from "./dto/query-business.dto";
+import { UpdateBusinessDto } from "./dto/update-business.dto";
+import { CreateBusinessDto } from "./dto/create-business.dto";
 
 @Injectable()
-export class StoresService {
+export class BusinessService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string, dto: CreateStoreDto) {
+  async create(userId: number, dto: CreateBusinessDto) {
     const slug = this.normalizeSlug(dto.slug || dto.name);
 
     await this.ensureSlugAvailable(userId, slug);
 
     try {
-      return await this.prisma.store.create({
+      return await this.prisma.business.create({
         data: {
-          ownerId: userId,
+          ownerUserId: userId,
           name: dto.name,
           slug,
           phone: dto.phone,
           address: dto.address,
-          status: StoreStatus.ACTIVE,
+          status: BusinessStatus.ACTIVE,
         },
       });
     } catch (error) {
@@ -35,9 +35,9 @@ export class StoresService {
     }
   }
 
-  async findAll(userId: string, query: StoreQueryDto) {
-    const where: Prisma.StoreWhereInput = {
-      ownerId: userId,
+  async findAll(userId: number, query: QueryBusinessDto) {
+    const where: Prisma.BusinessWhereInput = {
+      ownerUserId: userId,
       ...(query.status && {
         status: query.status,
       }),
@@ -65,7 +65,7 @@ export class StoresService {
       }),
     };
 
-    return this.prisma.store.findMany({
+    return this.prisma.business.findMany({
       where,
       orderBy: {
         createdAt: "desc",
@@ -83,11 +83,10 @@ export class StoresService {
     });
   }
 
-  async findOne(userId: string, storeId: string) {
-    const store = await this.prisma.store.findFirst({
+  async findOne(businessId: number) {
+    const business = await this.prisma.business.findFirst({
       where: {
-        id: storeId,
-        ownerId: userId,
+        id: businessId,
       },
       include: {
         _count: {
@@ -101,25 +100,23 @@ export class StoresService {
       },
     });
 
-    if (!store) {
-      throw new NotFoundException("Store not found");
+    if (!business) {
+      throw new NotFoundException("Business not found");
     }
 
-    return store;
+    return business;
   }
 
-  async update(userId: string, storeId: string, dto: UpdateStoreDto) {
-    // await this.assertStoreOwner(userId, storeId);
-
+  async update(userId: number, businessId: number, dto: UpdateBusinessDto) {
     let slug: string | undefined;
 
     if (dto.slug) {
       slug = this.normalizeSlug(dto.slug);
 
-      await this.ensureSlugAvailable(userId, slug, storeId);
+      await this.ensureSlugAvailable(userId, slug);
     }
 
-    const data: Prisma.StoreUpdateInput = {
+    const data: Prisma.BusinessUpdateInput = {
       ...(dto.name !== undefined && { name: dto.name }),
       ...(slug !== undefined && { slug }),
       ...(dto.phone !== undefined && { phone: dto.phone }),
@@ -127,9 +124,9 @@ export class StoresService {
     };
 
     try {
-      return await this.prisma.store.update({
+      return await this.prisma.business.update({
         where: {
-          id: storeId,
+          id: businessId,
         },
         data,
       });
@@ -138,74 +135,31 @@ export class StoresService {
     }
   }
 
-  async remove(userId: string, storeId: string) {
-    // await this.assertStoreOwner(userId, storeId);
-
-    await this.prisma.store.delete({
+  async remove(businessId: number) {
+    await this.prisma.business.delete({
       where: {
-        id: storeId,
+        id: businessId,
       },
     });
 
     return {
-      message: "Store deleted successfully",
+      message: "Business deleted successfully",
     };
   }
 
-  async assertStoreOwnerOrMember(userId: string, storeId: string) {
-    const store = await this.prisma.store.findFirst({
+  private async ensureSlugAvailable(userId: number, slug: string) {
+    const existingBusiness = await this.prisma.business.findFirst({
       where: {
-        id: storeId,
-        status: StoreStatus.ACTIVE,
-        OR: [
-          {
-            ownerId: userId,
-          },
-          {
-            members: {
-              some: {
-                userId,
-                status: StoreMemberStatus.ACTIVE,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        ownerId: true,
-      },
-    });
-
-    if (!store) {
-      throw new ForbiddenException("You do not have access to this store");
-    }
-
-    return store;
-  }
-
-  private async ensureSlugAvailable(
-    userId: string,
-    slug: string,
-    ignoreStoreId?: string,
-  ) {
-    const existingStore = await this.prisma.store.findFirst({
-      where: {
-        ownerId: userId,
+        ownerUserId: userId,
         slug,
-        ...(ignoreStoreId && {
-          NOT: {
-            id: ignoreStoreId,
-          },
-        }),
       },
       select: {
         id: true,
       },
     });
 
-    if (existingStore) {
-      throw new ConflictException("Store slug already exists");
+    if (existingBusiness) {
+      throw new ConflictException("Business slug already exists");
     }
   }
 
@@ -217,7 +171,7 @@ export class StoresService {
       .replace(/^-+|-+$/g, "");
 
     if (!slug) {
-      throw new ConflictException("Invalid store slug");
+      throw new ConflictException("Invalid business slug");
     }
 
     return slug;
@@ -228,7 +182,7 @@ export class StoresService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      throw new ConflictException("Store slug already exists");
+      throw new ConflictException("Business slug already exists");
     }
 
     throw error;
