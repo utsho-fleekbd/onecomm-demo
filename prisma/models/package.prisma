@@ -1,5 +1,6 @@
-// prisma/schema/package.prisma
-// PACKAGE / SUBSCRIPTION MODULE
+// =======================
+// Enums
+// =======================
 
 enum PackageBillingCycle {
   FREE
@@ -34,6 +35,10 @@ enum PackageSubscriptionAddonStatus {
   CANCELLED
   EXPIRED
 }
+
+// =======================
+// Models
+// =======================
 
 model PackagePlan {
   id            String              @id @default(uuid()) @db.Uuid

@@ -1,3 +1,28 @@
+// Business
+
+// =======================
+// Enums
+// =======================
+
+enum BusinessStatus {
+    TRIAL
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+enum BusinessMemberStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+
+// =======================
+// Models
+// =======================
+
+
 model Business {
     id           Int            @id @default(autoincrement())
     ownerUserId  Int            @map("owner_user_id")
