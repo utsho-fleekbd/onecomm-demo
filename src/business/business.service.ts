@@ -1,14 +1,38 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { BusinessStatus, Prisma } from "@prisma/client";
+import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CreateBusinessDto } from "./dto/create-business.dto";
+import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+
+const BUSINESS_INCLUDE = {
+  ownerUser: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      email: true,
+      type: true,
+      status: true,
+    },
+  },
+  settings: true,
+  branding: true,
+  _count: {
+    select: {
+      members: true,
+      roles: true,
+    },
+  },
+} satisfies Prisma.BusinessInclude;
 
 @Injectable()
 export class BusinessService {
@@ -17,30 +41,94 @@ export class BusinessService {
   async create(userId: number, dto: CreateBusinessDto) {
     const slug = this.normalizeSlug(dto.slug || dto.name);
 
-    await this.ensureSlugAvailable(userId, slug);
+    await this.ensureSlugAvailable(slug);
+
+    const settingsData = dto.settings
+      ? this.buildBusinessSettingData(dto.settings)
+      : {};
+
+    const brandingData = dto.branding
+      ? this.buildBusinessBrandingData(dto.branding)
+      : null;
 
     try {
       return await this.prisma.business.create({
         data: {
-          ownerUserId: userId,
-          name: dto.name,
+          name: dto.name.trim(),
           slug,
-          phone: dto.phone,
-          address: dto.address,
-          status: BusinessStatus.ACTIVE,
+          email: dto.email ? this.normalizeEmail(dto.email) : null,
+          phone: dto.phone?.trim() || null,
+          country: dto.country?.trim() || null,
+          currencyCode: dto.currencyCode?.trim().toUpperCase() || "BDT",
+          timezone: dto.timezone?.trim() || "Asia/Dhaka",
+          status: dto.status ?? BusinessStatus.TRIAL,
+
+          ownerUser: {
+            connect: {
+              id: userId,
+            },
+          },
+
+          createdBy: {
+            connect: {
+              id: userId,
+            },
+          },
+
+          settings: {
+            create: settingsData,
+          },
+
+          ...(brandingData &&
+            this.hasKeys(brandingData) && {
+              branding: {
+                create: brandingData,
+              },
+            }),
         },
+        include: BUSINESS_INCLUDE,
       });
     } catch (error) {
       this.handlePrismaError(error);
     }
   }
 
-  async findAll(userId: number, query: QueryBusinessDto) {
+  async findAll(currentUser: CurrentUserPayload, query: QueryBusinessDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const sortBy = query.sortBy ?? "createdAt";
+    const sortOrder = query.sortOrder ?? "desc";
+
+    const canIncludeDeleted =
+      currentUser.type === SystemUserType.ADMIN && query.includeDeleted;
+
     const where: Prisma.BusinessWhereInput = {
-      ownerUserId: userId,
+      ...(!canIncludeDeleted && {
+        deletedAt: null,
+      }),
+
+      ...this.getBusinessAccessWhere(currentUser),
+
       ...(query.status && {
         status: query.status,
       }),
+
+      ...(query.country && {
+        country: {
+          equals: query.country,
+          mode: "insensitive",
+        },
+      }),
+
+      ...(query.currencyCode && {
+        currencyCode: {
+          equals: query.currencyCode,
+          mode: "insensitive",
+        },
+      }),
+
       ...(query.search && {
         OR: [
           {
@@ -56,7 +144,19 @@ export class BusinessService {
             },
           },
           {
+            email: {
+              contains: query.search,
+              mode: "insensitive",
+            },
+          },
+          {
             phone: {
+              contains: query.search,
+              mode: "insensitive",
+            },
+          },
+          {
+            country: {
               contains: query.search,
               mode: "insensitive",
             },
@@ -65,39 +165,43 @@ export class BusinessService {
       }),
     };
 
-    return this.prisma.business.findMany({
-      where,
-      orderBy: {
-        createdAt: "desc",
+    const orderBy: Prisma.BusinessOrderByWithRelationInput = {
+      [sortBy]: sortOrder,
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.business.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: BUSINESS_INCLUDE,
+      }),
+
+      this.prisma.business.count({
+        where,
+      }),
+    ]);
+
+    return {
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      include: {
-        _count: {
-          select: {
-            roles: true,
-            members: true,
-            products: true,
-            categories: true,
-          },
-        },
-      },
-    });
+      items,
+    };
   }
 
-  async findOne(businessId: number) {
+  async findOne(currentUser: CurrentUserPayload, businessId: number) {
     const business = await this.prisma.business.findFirst({
       where: {
         id: businessId,
+        deletedAt: null,
+        ...this.getBusinessAccessWhere(currentUser),
       },
-      include: {
-        _count: {
-          select: {
-            roles: true,
-            members: true,
-            products: true,
-            categories: true,
-          },
-        },
-      },
+      include: BUSINESS_INCLUDE,
     });
 
     if (!business) {
@@ -107,20 +211,86 @@ export class BusinessService {
     return business;
   }
 
-  async update(userId: number, businessId: number, dto: UpdateBusinessDto) {
+  async update(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    dto: UpdateBusinessDto,
+  ) {
+    await this.assertCanManageBusiness(currentUser, businessId);
+
     let slug: string | undefined;
 
-    if (dto.slug) {
+    if (dto.slug !== undefined) {
       slug = this.normalizeSlug(dto.slug);
-
-      await this.ensureSlugAvailable(userId, slug);
+      await this.ensureSlugAvailable(slug, businessId);
     }
 
+    const settingData = dto.settings
+      ? this.buildBusinessSettingData(dto.settings)
+      : null;
+
+    const brandingData = dto.branding
+      ? this.buildBusinessBrandingData(dto.branding)
+      : null;
+
     const data: Prisma.BusinessUpdateInput = {
-      ...(dto.name !== undefined && { name: dto.name }),
-      ...(slug !== undefined && { slug }),
-      ...(dto.phone !== undefined && { phone: dto.phone }),
-      ...(dto.address !== undefined && { address: dto.address }),
+      ...(dto.name !== undefined && {
+        name: dto.name.trim(),
+      }),
+
+      ...(slug !== undefined && {
+        slug,
+      }),
+
+      ...(dto.email !== undefined && {
+        email: dto.email ? this.normalizeEmail(dto.email) : null,
+      }),
+
+      ...(dto.phone !== undefined && {
+        phone: dto.phone?.trim() || null,
+      }),
+
+      ...(dto.country !== undefined && {
+        country: dto.country?.trim() || null,
+      }),
+
+      ...(dto.currencyCode !== undefined && {
+        currencyCode: dto.currencyCode.trim().toUpperCase(),
+      }),
+
+      ...(dto.timezone !== undefined && {
+        timezone: dto.timezone.trim(),
+      }),
+
+      ...(dto.status !== undefined && {
+        status: dto.status,
+      }),
+
+      updatedBy: {
+        connect: {
+          id: currentUser.id,
+        },
+      },
+
+      ...(settingData &&
+        this.hasKeys(settingData) && {
+          settings: {
+            upsert: {
+              create: settingData,
+              update: settingData,
+            },
+          },
+        }),
+
+      ...(brandingData &&
+        this.hasKeys(brandingData) && {
+          branding: {
+            upsert: {
+              create: brandingData,
+              update: brandingData,
+            },
+          },
+        }),
     };
 
     try {
@@ -129,16 +299,28 @@ export class BusinessService {
           id: businessId,
         },
         data,
+        include: BUSINESS_INCLUDE,
       });
     } catch (error) {
       this.handlePrismaError(error);
     }
   }
 
-  async remove(businessId: number) {
-    await this.prisma.business.delete({
+  async remove(currentUser: CurrentUserPayload, businessId: number) {
+    await this.assertCanManageBusiness(currentUser, businessId);
+
+    await this.prisma.business.update({
       where: {
         id: businessId,
+      },
+      data: {
+        status: BusinessStatus.INACTIVE,
+        deletedAt: new Date(),
+        updatedBy: {
+          connect: {
+            id: currentUser.id,
+          },
+        },
       },
     });
 
@@ -147,11 +329,68 @@ export class BusinessService {
     };
   }
 
-  private async ensureSlugAvailable(userId: number, slug: string) {
+  private getBusinessAccessWhere(
+    currentUser: CurrentUserPayload,
+  ): Prisma.BusinessWhereInput {
+    if (currentUser.type === SystemUserType.ADMIN) {
+      return {};
+    }
+
+    return {
+      OR: [
+        {
+          ownerUserId: currentUser.id,
+        },
+        {
+          members: {
+            some: {
+              userId: currentUser.id,
+              deletedAt: null,
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  private async assertCanManageBusiness(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+  ) {
+    const where: Prisma.BusinessWhereInput = {
+      id: businessId,
+      deletedAt: null,
+
+      ...(currentUser.type === SystemUserType.ADMIN
+        ? {}
+        : {
+            ownerUserId: currentUser.id,
+          }),
+    };
+
+    const business = await this.prisma.business.findFirst({
+      where,
+      select: {
+        id: true,
+      },
+    });
+
+    if (!business) {
+      throw new ForbiddenException(
+        "You do not have permission for this business",
+      );
+    }
+  }
+
+  private async ensureSlugAvailable(slug: string, ignoreBusinessId?: number) {
     const existingBusiness = await this.prisma.business.findFirst({
       where: {
-        ownerUserId: userId,
         slug,
+        ...(ignoreBusinessId && {
+          id: {
+            not: ignoreBusinessId,
+          },
+        }),
       },
       select: {
         id: true,
@@ -163,6 +402,90 @@ export class BusinessService {
     }
   }
 
+  private buildBusinessSettingData(
+    dto: NonNullable<CreateBusinessDto["settings"]>,
+  ) {
+    return {
+      ...(dto.orderPrefix !== undefined && {
+        orderPrefix: dto.orderPrefix.trim().toUpperCase(),
+      }),
+
+      ...(dto.invoicePrefix !== undefined && {
+        invoicePrefix: dto.invoicePrefix.trim().toUpperCase(),
+      }),
+
+      ...(dto.defaultLanguage !== undefined && {
+        defaultLanguage: dto.defaultLanguage.trim().toLowerCase(),
+      }),
+
+      ...(dto.defaultCurrency !== undefined && {
+        defaultCurrency: dto.defaultCurrency.trim().toUpperCase(),
+      }),
+
+      ...(dto.timezone !== undefined && {
+        timezone: dto.timezone.trim(),
+      }),
+
+      ...(dto.lowStockThreshold !== undefined && {
+        lowStockThreshold: dto.lowStockThreshold,
+      }),
+
+      ...(dto.allowBackorder !== undefined && {
+        allowBackorder: dto.allowBackorder,
+      }),
+
+      ...(dto.autoConfirmOrder !== undefined && {
+        autoConfirmOrder: dto.autoConfirmOrder,
+      }),
+
+      ...(dto.codEnabled !== undefined && {
+        codEnabled: dto.codEnabled,
+      }),
+
+      ...(dto.onlinePaymentEnabled !== undefined && {
+        onlinePaymentEnabled: dto.onlinePaymentEnabled,
+      }),
+    };
+  }
+
+  private buildBusinessBrandingData(
+    dto: NonNullable<CreateBusinessDto["branding"]>,
+  ) {
+    return {
+      ...(dto.logoUrl !== undefined && {
+        logoUrl: dto.logoUrl || null,
+      }),
+
+      ...(dto.faviconUrl !== undefined && {
+        faviconUrl: dto.faviconUrl || null,
+      }),
+
+      ...(dto.primaryColor !== undefined && {
+        primaryColor: dto.primaryColor || null,
+      }),
+
+      ...(dto.secondaryColor !== undefined && {
+        secondaryColor: dto.secondaryColor || null,
+      }),
+
+      ...(dto.accentColor !== undefined && {
+        accentColor: dto.accentColor || null,
+      }),
+
+      ...(dto.fontFamily !== undefined && {
+        fontFamily: dto.fontFamily || null,
+      }),
+
+      ...(dto.seoTitle !== undefined && {
+        seoTitle: dto.seoTitle || null,
+      }),
+
+      ...(dto.seoDescription !== undefined && {
+        seoDescription: dto.seoDescription || null,
+      }),
+    };
+  }
+
   private normalizeSlug(value: string) {
     const slug = value
       .trim()
@@ -171,10 +494,24 @@ export class BusinessService {
       .replace(/^-+|-+$/g, "");
 
     if (!slug) {
-      throw new ConflictException("Invalid business slug");
+      throw new BadRequestException("Invalid business slug");
+    }
+
+    if (slug.length > 180) {
+      throw new BadRequestException(
+        "Business slug must be less than 180 characters",
+      );
     }
 
     return slug;
+  }
+
+  private normalizeEmail(email: string) {
+    return email.trim().toLowerCase();
+  }
+
+  private hasKeys(value: object) {
+    return Object.keys(value).length > 0;
   }
 
   private handlePrismaError(error: unknown): never {

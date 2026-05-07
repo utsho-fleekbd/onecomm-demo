@@ -1,14 +1,14 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "./decorators/current-user.decorator";
-import type { CurrentUserPayload } from "./decorators/current-user.decorator";
-import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
-import { SelectStoreDto } from "./dto/select-business.dto";
-import { RequireAdmin } from "./guards/require-admin";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { SelectStoreDto } from "./dto/select-business.dto";
+import { CurrentUser } from "./decorators/current-user.decorator";
+import type { CurrentUserPayload } from "./decorators/current-user.decorator";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -52,13 +52,5 @@ export class AuthController {
   @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
     return this.authService.me(user.id, user.businessId);
-  }
-
-  @Get("admins")
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RequireAdmin)
-  @ApiOperation({ summary: "Get all tenants" })
-  getTenants() {
-    return this.authService.getTenants();
   }
 }

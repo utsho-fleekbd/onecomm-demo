@@ -6,8 +6,6 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { BusinessModule } from "./business/business.module";
-import { UsersModule } from "./users/users.module";
-import { RolesModule } from "./roles/roles.module";
 import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.middleware";
 
 @Module({
@@ -18,8 +16,6 @@ import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.mid
     PrismaModule,
     AuthModule,
     BusinessModule,
-    UsersModule,
-    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

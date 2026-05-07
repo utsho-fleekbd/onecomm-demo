@@ -1,33 +1,35 @@
 import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from "@nestjs/swagger";
-import {
   Body,
   Controller,
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { BusinessService } from "./business.service";
-import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { QueryBusinessDto } from "./dto/query-business.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CreateBusinessDto } from "./dto/create-business.dto";
+import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { RequireBusinessAccess } from "../auth/guards/requireBusinessAccess";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 @ApiTags("Business")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller("business")
+@UseGuards(JwtAuthGuard, RequireBusinessAccess)
+@Controller("businesses")
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
@@ -41,36 +43,42 @@ export class BusinessController {
   }
 
   @Get()
-  @ApiOperation({ summary: "Get all businesses" })
+  @ApiOperation({ summary: "Get businesses" })
   findAll(
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: QueryBusinessDto,
   ) {
-    return this.businessService.findAll(user.id, query);
+    return this.businessService.findAll(user, query);
   }
 
   @Get(":businessId")
   @ApiOperation({ summary: "Get business details" })
-  @ApiParam({ name: "businessId", example: "business-uuid" })
-  findOne(@Param("businessId") businessId: string) {
-    return this.businessService.findOne(+businessId);
+  @ApiParam({ name: "businessId", example: 1 })
+  findOne(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param("businessId", ParseIntPipe) businessId: number,
+  ) {
+    return this.businessService.findOne(user, businessId);
   }
 
   @Patch(":businessId")
   @ApiOperation({ summary: "Update business" })
-  @ApiParam({ name: "businessId", example: "business-uuid" })
+  @ApiParam({ name: "businessId", example: 1 })
   update(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId") businessId: string,
+    @Param("businessId", ParseIntPipe) businessId: number,
     @Body() dto: UpdateBusinessDto,
   ) {
-    return this.businessService.update(user.id, +businessId, dto);
+    return this.businessService.update(user, businessId, dto);
   }
 
   @Delete(":businessId")
   @ApiOperation({ summary: "Delete business" })
-  @ApiParam({ name: "businessId", example: "business-uuid" })
-  remove(@Param("businessId") businessId: string) {
-    return this.businessService.remove(+businessId);
+  @ApiParam({ name: "businessId", example: 1 })
+  remove(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param("businessId", ParseIntPipe) businessId: number,
+  ) {
+    return this.businessService.remove(user, businessId);
   }
 }

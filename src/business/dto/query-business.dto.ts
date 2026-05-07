@@ -1,6 +1,16 @@
-import { BusinessStatus } from "@prisma/client";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { BusinessStatus } from "@prisma/client";
+import { Type } from "class-transformer";
+import {
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
 
 export class QueryBusinessDto {
   @ApiPropertyOptional({ example: "matrix" })
@@ -8,8 +18,56 @@ export class QueryBusinessDto {
   @IsString()
   declare search?: string;
 
-  @ApiPropertyOptional({ enum: BusinessStatus, example: BusinessStatus.ACTIVE })
+  @ApiPropertyOptional({ enum: BusinessStatus })
   @IsOptional()
   @IsEnum(BusinessStatus)
   declare status?: BusinessStatus;
+
+  @ApiPropertyOptional({ example: "BDT" })
+  @IsOptional()
+  @IsString()
+  declare currencyCode?: string;
+
+  @ApiPropertyOptional({ example: "Bangladesh" })
+  @IsOptional()
+  @IsString()
+  declare country?: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ example: 20, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 10;
+
+  @ApiPropertyOptional({
+    example: "createdAt",
+    enum: ["id", "name", "slug", "status", "createdAt", "updatedAt"],
+  })
+  @IsOptional()
+  @IsIn(["id", "name", "slug", "status", "createdAt", "updatedAt"])
+  sortBy?: "id" | "name" | "slug" | "status" | "createdAt" | "updatedAt" =
+    "createdAt";
+
+  @ApiPropertyOptional({
+    example: "desc",
+    enum: ["asc", "desc"],
+  })
+  @IsOptional()
+  @IsIn(["asc", "desc"])
+  sortOrder?: "asc" | "desc" = "desc";
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeDeleted?: boolean = false;
 }

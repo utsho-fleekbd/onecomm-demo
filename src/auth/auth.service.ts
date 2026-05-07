@@ -354,18 +354,6 @@ export class AuthService {
     };
   }
 
-  async getTenants() {
-    return this.prisma.systemUser.findMany({
-      where: { type: SystemUserType.TENANT },
-      omit: { passwordHash: true },
-      include: {
-        _count: {
-          select: { ownedBusinesses: true, memberships: true },
-        },
-      },
-    });
-  }
-
   private async issueTokenPair(payload: JwtPayload) {
     const accessToken = await this.generateAccessToken(payload);
     const refreshToken = this.generateRefreshToken();
