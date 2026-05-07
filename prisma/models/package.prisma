@@ -1,0 +1,213 @@
+// prisma/schema/package.prisma
+// PACKAGE / SUBSCRIPTION MODULE
+
+enum PackageBillingCycle {
+  FREE
+  MONTHLY
+  YEARLY
+  ONE_TIME
+}
+
+enum PackageStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum PackageResetCycle {
+  LIFETIME
+  DAILY
+  MONTHLY
+  YEARLY
+}
+
+enum PackageSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum PackageSubscriptionAddonStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model PackagePlan {
+  id            String              @id @default(uuid()) @db.Uuid
+  name          String              @db.VarChar(150)
+  description   String?
+  price         Decimal             @default(0) @db.Decimal(12, 2)
+  billingCycle  PackageBillingCycle @map("billing_cycle")
+  currencyCode  String              @default("BDT") @map("currency_code") @db.VarChar(10)
+  freeTrialDays Int                 @default(0) @map("free_trial_days")
+  status        PackageStatus       @default(ACTIVE)
+  sortOrder     Int                 @default(0) @map("sort_order")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  deletedAt     DateTime?           @map("deleted_at")
+
+  features      PackagePlanFeature[]
+  limits        PackagePlanLimit[]
+  subscriptions PackageSubscription[]
+
+  @@unique([name])
+  @@index([status])
+  @@map("package_plans")
+}
+
+model PackageFeature {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String        @db.VarChar(150)
+  description String?
+  status      PackageStatus @default(ACTIVE)
+  sortOrder   Int           @default(0) @map("sort_order")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  plans       PackagePlanFeature[]
+
+  @@unique([name])
+  @@index([status])
+  @@map("package_features")
+}
+
+model PackagePlanFeature {
+  id        String   @id @default(uuid()) @db.Uuid
+  packageId String   @map("package_id") @db.Uuid
+  featureId String   @map("feature_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  package   PackagePlan    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  feature   PackageFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, featureId])
+  @@index([featureId])
+  @@map("package_plan_features")
+}
+
+model PackagePlanLimit {
+  id          String            @id @default(uuid()) @db.Uuid
+  packageId   String            @map("package_id") @db.Uuid
+  limitKey    String            @map("limit_key") @db.VarChar(100)
+  limitValue  Int               @map("limit_value")
+  resetCycle  PackageResetCycle @default(LIFETIME) @map("reset_cycle")
+  description String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  package     PackagePlan       @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, limitKey])
+  @@index([limitKey])
+  @@map("package_plan_limits")
+}
+
+model PackageAddon {
+  id            String              @id @default(uuid()) @db.Uuid
+  name          String              @db.VarChar(150)
+  description   String?
+  price         Decimal             @default(0) @db.Decimal(12, 2)
+  billingCycle  PackageBillingCycle @map("billing_cycle")
+  currencyCode  String              @default("BDT") @map("currency_code") @db.VarChar(10)
+  status        PackageStatus       @default(ACTIVE)
+  sortOrder     Int                 @default(0) @map("sort_order")
+  createdBy     String?             @map("created_by") @db.Uuid
+  updatedBy     String?             @map("updated_by") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  deletedAt     DateTime?           @map("deleted_at")
+
+  limits        PackageAddonLimit[]
+  subscriptions PackageSubscriptionAddon[]
+
+  @@unique([name])
+  @@index([status])
+  @@map("package_addons")
+}
+
+model PackageAddonLimit {
+  id         String            @id @default(uuid()) @db.Uuid
+  addonId    String            @map("addon_id") @db.Uuid
+  limitKey   String            @map("limit_key") @db.VarChar(100)
+  limitValue Int               @map("limit_value")
+  resetCycle PackageResetCycle @default(LIFETIME) @map("reset_cycle")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  addon      PackageAddon      @relation(fields: [addonId], references: [id], onDelete: Cascade)
+
+  @@unique([addonId, limitKey])
+  @@index([limitKey])
+  @@map("package_addon_limits")
+}
+
+model PackageSubscription {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  tenantId           String                    @map("tenant_id") @db.Uuid
+  packageId          String                    @map("package_id") @db.Uuid
+  status             PackageSubscriptionStatus @default(TRIALING)
+  billingCycle       PackageBillingCycle       @map("billing_cycle")
+  price              Decimal                   @default(0) @db.Decimal(12, 2)
+  currencyCode       String                    @default("BDT") @map("currency_code") @db.VarChar(10)
+  startedAt          DateTime                  @map("started_at")
+  trialEndsAt        DateTime?                 @map("trial_ends_at")
+  currentPeriodStart DateTime                  @map("current_period_start")
+  currentPeriodEnd   DateTime                  @map("current_period_end")
+  endedAt            DateTime?                 @map("ended_at")
+  endReason          String?                   @map("end_reason")
+  autoRenew          Boolean                   @default(true) @map("auto_renew")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+
+  package            PackagePlan               @relation(fields: [packageId], references: [id])
+  addons             PackageSubscriptionAddon[]
+  usageCounters      PackageUsageCounter[]
+
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("package_subscriptions")
+}
+
+model PackageSubscriptionAddon {
+  id             String                         @id @default(uuid()) @db.Uuid
+  subscriptionId String                         @map("subscription_id") @db.Uuid
+  addonId        String                         @map("addon_id") @db.Uuid
+  quantity       Int                            @default(1)
+  status         PackageSubscriptionAddonStatus @default(ACTIVE)
+  price          Decimal                        @default(0) @db.Decimal(12, 2)
+  currencyCode   String                         @default("BDT") @map("currency_code") @db.VarChar(10)
+  createdAt      DateTime                       @default(now()) @map("created_at")
+  updatedAt      DateTime                       @updatedAt @map("updated_at")
+
+  subscription   PackageSubscription            @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  addon          PackageAddon                   @relation(fields: [addonId], references: [id])
+
+  @@unique([subscriptionId, addonId])
+  @@index([addonId])
+  @@index([status])
+  @@map("package_subscription_addons")
+}
+
+model PackageUsageCounter {
+  id             String              @id @default(uuid()) @db.Uuid
+  subscriptionId String              @map("subscription_id") @db.Uuid
+  limitKey       String              @map("limit_key") @db.VarChar(100)
+  usedValue      Int                 @default(0) @map("used_value")
+  periodStart    DateTime            @map("period_start")
+  periodEnd      DateTime            @map("period_end")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  subscription   PackageSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, limitKey, periodStart, periodEnd])
+  @@index([limitKey])
+  @@index([periodStart, periodEnd])
+  @@map("package_usage_counters")
+}
