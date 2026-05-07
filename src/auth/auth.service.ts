@@ -1,10 +1,10 @@
-import * as bcrypt from "bcryptjs";
+import * as argon2 from "argon2";
 import { createHash, randomBytes } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { SystemUser, SystemUserStatus, SystemUserType } from "@prisma/client";
 import {
-  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
@@ -13,9 +13,10 @@ import {
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { LogoutDto } from "./dto/logout.dto";
 import { PrismaService } from "../prisma/prisma.service";
-import { BusinessService } from "../business/business.service";
 import { JwtPayload } from "./strategies/jwt.strategy";
+import { SelectBusinessDto } from "./dto/select-business.dto";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -34,7 +35,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly businessService: BusinessService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -42,39 +42,50 @@ export class AuthService {
 
     const existingUser = await this.prisma.systemUser.findUnique({
       where: { email },
+      select: {
+        id: true,
+      },
     });
 
     if (existingUser) {
-      throw new BadRequestException("Email already exists");
+      throw new ConflictException("Email already exists");
     }
 
     const passwordHash = await this.hashPassword(dto.password);
 
-    const user = await this.prisma.systemUser.create({
-      data: {
-        name: dto.name,
-        email,
-        passwordHash,
-        type: SystemUserType.ADMIN,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        type: true,
-        status: true,
-        createdAt: true,
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.systemUser.create({
+        data: {
+          name: dto.name,
+          email,
+          passwordHash,
 
-    const business = await this.businessService.create(user.id, {
-      name: "Matrix",
-    });
+          type: SystemUserType.TENANT,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          type: true,
+          status: true,
+          createdAt: true,
+        },
+      });
 
-    return {
-      selectedBusiness: business,
-      user,
-    };
+      const selectedBusiness = await tx.business.create({
+        data: {
+          name: "New Business",
+          slug: "new-business",
+          ownerUserId: user.id,
+        },
+        select: this.getBusinessSelect(user.id),
+      });
+
+      return {
+        selectedBusiness,
+        user,
+      };
+    });
   }
 
   async login(dto: LoginDto) {
@@ -88,9 +99,9 @@ export class AuthService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
-    const isPasswordMatched = await bcrypt.compare(
-      dto.password,
+    const isPasswordMatched = await this.verifyPassword(
       user.passwordHash,
+      dto.password,
     );
 
     if (!isPasswordMatched) {
@@ -115,35 +126,7 @@ export class AuthService {
       };
     }
 
-    const businesses = await this.prisma.business.findMany({
-      where: {
-        OR: [
-          {
-            ownerUserId: user.id,
-          },
-          {
-            members: {
-              some: {
-                userId: user.id,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        ownerUserId: true,
-        members: {
-          where: {
-            userId: user.id,
-          },
-          select: {
-            id: true,
-            userId: true,
-          },
-        },
-      },
-    });
+    const businesses = await this.findAccessibleBusinesses(user.id);
 
     if (businesses.length === 0) {
       throw new ForbiddenException("You are not assigned to any business");
@@ -157,23 +140,16 @@ export class AuthService {
       businessId: selectedBusiness.id,
     });
 
-    if (user.type === SystemUserType.TENANT) {
-      return {
-        ...tokens,
-        selectedBusiness,
-        businesses,
-        user: safeUser,
-      };
-    }
-
     return {
       ...tokens,
       selectedBusiness,
+      businesses,
       user: safeUser,
     };
   }
 
   async refresh(dto: RefreshTokenDto) {
+    const now = new Date();
     const refreshTokenHash = this.hashRefreshToken(dto.refreshToken);
 
     const session = await this.prisma.systemSession.findUnique({
@@ -190,10 +166,22 @@ export class AuthService {
     }
 
     if (session.revokedAt) {
-      throw new UnauthorizedException("Refresh token has been revoked");
+      await this.revokeAllUserSessions(session.userId);
+
+      throw new UnauthorizedException("Refresh token reuse detected");
     }
 
-    if (session.expiresAt <= new Date()) {
+    if (session.expiresAt <= now) {
+      await this.prisma.systemSession.updateMany({
+        where: {
+          id: session.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      });
+
       throw new UnauthorizedException("Refresh token has expired");
     }
 
@@ -201,49 +189,50 @@ export class AuthService {
 
     this.assertActiveUser(user);
 
-    let businessId: number | null = null;
-    let selectedBusiness: AuthBusiness | null = null;
+    const requestedBusinessId = dto.businessId ?? session.businessId;
 
-    if (dto.businessId) {
-      selectedBusiness = await this.findAccessibleBusiness(
-        user.id,
-        dto.businessId,
-      );
+    const selectedBusiness = await this.resolveSelectedBusiness(
+      user.id,
+      user.type,
+      requestedBusinessId,
+    );
 
-      if (!selectedBusiness) {
-        throw new ForbiddenException("You do not have access to this business");
-      }
-
-      businessId = selectedBusiness.id;
-    }
+    const tokenBusinessId = selectedBusiness?.id ?? null;
 
     const accessToken = await this.generateAccessToken({
       sub: user.id,
       type: user.type,
-      businessId,
+      businessId: tokenBusinessId,
     });
 
     const newRefreshToken = this.generateRefreshToken();
     const newRefreshTokenHash = this.hashRefreshToken(newRefreshToken);
+    const newRefreshTokenExpiresAt = this.getRefreshTokenExpiresAt();
 
-    await this.prisma.$transaction([
-      this.prisma.systemSession.update({
+    await this.prisma.$transaction(async (tx) => {
+      const revokedSession = await tx.systemSession.updateMany({
         where: {
           id: session.id,
+          revokedAt: null,
         },
         data: {
-          revokedAt: new Date(),
+          revokedAt: now,
         },
-      }),
+      });
 
-      this.prisma.systemSession.create({
+      if (revokedSession.count !== 1) {
+        throw new UnauthorizedException("Refresh token has already been used");
+      }
+
+      await tx.systemSession.create({
         data: {
           userId: user.id,
+          businessId: tokenBusinessId,
           refreshTokenHash: newRefreshTokenHash,
-          expiresAt: this.getRefreshTokenExpiresAt(),
+          expiresAt: newRefreshTokenExpiresAt,
         },
-      }),
-    ]);
+      });
+    });
 
     return {
       accessToken,
@@ -253,7 +242,7 @@ export class AuthService {
     };
   }
 
-  async selectStore(userId: number, businessId: number) {
+  async selectBusiness(userId: number, dto: SelectBusinessDto) {
     const user = await this.prisma.systemUser.findUnique({
       where: {
         id: userId,
@@ -267,11 +256,9 @@ export class AuthService {
       throw new UnauthorizedException("Invalid authenticated user");
     }
 
-    if (user.status !== SystemUserStatus.ACTIVE) {
-      throw new ForbiddenException("User account is not active");
-    }
+    this.assertActiveUser(user);
 
-    const business = await this.findAccessibleBusiness(userId, businessId);
+    const business = await this.findAccessibleBusiness(userId, dto.businessId);
 
     if (!business) {
       throw new ForbiddenException("You do not have access to this business");
@@ -282,6 +269,12 @@ export class AuthService {
       type: user.type,
       businessId: business.id,
     });
+
+    await this.bindRefreshSessionToBusiness(
+      user.id,
+      dto.refreshToken,
+      business.id,
+    );
 
     return {
       accessToken,
@@ -304,53 +297,65 @@ export class AuthService {
       throw new UnauthorizedException("Invalid authenticated user");
     }
 
-    const businesses = await this.prisma.business.findMany({
-      where: {
-        OR: [
-          {
-            ownerUserId: userId,
-          },
-          {
-            members: {
-              some: {
-                userId,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        ownerUserId: true,
-        members: {
-          where: {
-            userId,
-          },
-          select: {
-            id: true,
-            userId: true,
-          },
-        },
-      },
-    });
+    this.assertActiveUser(user);
+
+    if (user.type === SystemUserType.ADMIN) {
+      return {
+        user,
+        selectedBusiness: null,
+      };
+    }
+
+    const businesses = await this.findAccessibleBusinesses(userId);
+
+    if (businesses.length === 0) {
+      throw new ForbiddenException("You are not assigned to any business");
+    }
 
     let selectedBusiness: AuthBusiness | null = null;
 
-    if (businessId) {
-      selectedBusiness = await this.findAccessibleBusiness(userId, businessId);
-    }
+    if (businessId !== null) {
+      selectedBusiness =
+        businesses.find((business) => business.id === businessId) ?? null;
 
-    if (user.type === SystemUserType.TENANT) {
-      return {
-        user,
-        selectedBusiness,
-        businesses,
-      };
+      if (!selectedBusiness) {
+        throw new ForbiddenException(
+          "You no longer have access to this business",
+        );
+      }
     }
 
     return {
       user,
       selectedBusiness,
+      businesses,
+    };
+  }
+
+  async logout(dto: LogoutDto, userId?: number) {
+    const refreshTokenHash = this.hashRefreshToken(dto.refreshToken);
+
+    await this.prisma.systemSession.updateMany({
+      where: {
+        refreshTokenHash,
+        revokedAt: null,
+        ...(userId !== undefined ? { userId } : {}),
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    return {
+      message: "Logged out successfully",
+    };
+  }
+
+  async logoutAll(userId: number) {
+    await this.revokeAllUserSessions(userId);
+
+    return {
+      message: "Logged out from all devices successfully",
     };
   }
 
@@ -361,6 +366,7 @@ export class AuthService {
     await this.prisma.systemSession.create({
       data: {
         userId: payload.sub,
+        businessId: payload.businessId ?? null,
         refreshTokenHash: this.hashRefreshToken(refreshToken),
         expiresAt: this.getRefreshTokenExpiresAt(),
       },
@@ -387,14 +393,51 @@ export class AuthService {
   }
 
   private getRefreshTokenExpiresAt() {
-    const days =
-      Number(this.configService.get<string>("JWT_REFRESH_EXPIRES_IN_DAYS")) ||
-      30;
+    const rawDays = this.configService.getOrThrow<string>(
+      "JWT_REFRESH_EXPIRES_IN_DAYS",
+    );
+
+    const days = Number(rawDays);
+
+    if (!Number.isInteger(days) || days <= 0) {
+      throw new Error("JWT_REFRESH_EXPIRES_IN_DAYS must be a positive integer");
+    }
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + days);
 
     return expiresAt;
+  }
+
+  private async resolveSelectedBusiness(
+    userId: number,
+    userType: SystemUserType,
+    requestedBusinessId: number | null,
+  ): Promise<AuthBusiness | null> {
+    if (userType === SystemUserType.ADMIN) {
+      return null;
+    }
+
+    if (requestedBusinessId !== null) {
+      const business = await this.findAccessibleBusiness(
+        userId,
+        requestedBusinessId,
+      );
+
+      if (!business) {
+        throw new ForbiddenException("You do not have access to this business");
+      }
+
+      return business;
+    }
+
+    const businesses = await this.findAccessibleBusinesses(userId);
+
+    if (businesses.length === 0) {
+      throw new ForbiddenException("You are not assigned to any business");
+    }
+
+    return businesses[0];
   }
 
   private async findAccessibleBusiness(
@@ -417,20 +460,80 @@ export class AuthService {
           },
         ],
       },
-      select: {
-        id: true,
-        ownerUserId: true,
-        members: {
-          where: {
-            userId,
+      select: this.getBusinessSelect(userId),
+    });
+  }
+
+  private async findAccessibleBusinesses(
+    userId: number,
+  ): Promise<AuthBusiness[]> {
+    return this.prisma.business.findMany({
+      where: {
+        OR: [
+          {
+            ownerUserId: userId,
           },
-          select: {
-            id: true,
-            userId: true,
+          {
+            members: {
+              some: {
+                userId,
+              },
+            },
           },
-        },
+        ],
+      },
+      select: this.getBusinessSelect(userId),
+      orderBy: {
+        id: "asc",
       },
     });
+  }
+
+  private async bindRefreshSessionToBusiness(
+    userId: number,
+    refreshToken: string,
+    businessId: number,
+  ) {
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+
+    await this.prisma.systemSession.updateMany({
+      where: {
+        userId,
+        refreshTokenHash,
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      data: {
+        businessId,
+      },
+    });
+  }
+
+  private async revokeAllUserSessions(userId: number) {
+    await this.prisma.systemSession.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
+  private getBusinessSelect(userId: number) {
+    return {
+      id: true,
+      name: true,
+      ownerUserId: true,
+      members: {
+        where: {
+          userId,
+        },
+      },
+    } as const;
   }
 
   private assertActiveUser(user: Pick<SystemUser, "status">) {
@@ -457,6 +560,16 @@ export class AuthService {
   }
 
   private async hashPassword(password: string) {
-    return bcrypt.hash(password, 10);
+    return argon2.hash(password, {
+      type: argon2.argon2id,
+    });
+  }
+
+  private async verifyPassword(passwordHash: string, password: string) {
+    try {
+      return await argon2.verify(passwordHash, password);
+    } catch {
+      return false;
+    }
   }
 }

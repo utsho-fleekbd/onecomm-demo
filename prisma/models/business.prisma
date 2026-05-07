@@ -2,7 +2,7 @@ model Business {
     id           Int            @id @default(autoincrement())
     ownerUserId  Int            @map("owner_user_id")
     name         String         @db.VarChar(150)
-    slug         String         @unique @db.VarChar(180)
+    slug         String         @db.VarChar(180)
     email        String?        @db.VarChar(255)
     phone        String?        @db.VarChar(30)
     country      String?        @db.VarChar(100)
@@ -27,6 +27,7 @@ model Business {
     roles     RbacRole[]
     auditLogs SystemAuditLog[]
 
+    @@unique([slug, ownerUserId])
     @@index([ownerUserId])
     @@index([status])
     @@index([deletedAt])

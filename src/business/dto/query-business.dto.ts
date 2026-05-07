@@ -13,7 +13,7 @@ import {
 } from "class-validator";
 
 export class QueryBusinessDto {
-  @ApiPropertyOptional({ example: "matrix" })
+  @ApiPropertyOptional({ example: "business" })
   @IsOptional()
   @IsString()
   declare search?: string;
@@ -40,7 +40,7 @@ export class QueryBusinessDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ example: 20, default: 20 })
+  @ApiPropertyOptional({ example: 10, default: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

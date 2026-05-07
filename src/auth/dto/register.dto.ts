@@ -23,7 +23,7 @@ export class RegisterDto {
   @MinLength(6)
   declare password: string;
 
-  @ApiProperty({ example: "Matrix" })
+  @ApiProperty({ example: "New Business" })
   @IsString()
   @IsOptional()
   declare businessName?: string;

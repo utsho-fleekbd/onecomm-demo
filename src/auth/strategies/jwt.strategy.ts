@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { SystemUserStatus, SystemUserType } from "@prisma/client";
 import { ExtractJwt, Strategy } from "passport-jwt";
+
 import { PrismaService } from "../../prisma/prisma.service";
 import { CurrentUserPayload } from "../decorators/current-user.decorator";
 
@@ -13,7 +14,9 @@ export type JwtPayload = {
   type: SystemUserType;
 };
 
-export type AuthenticatedRequest = Request & { user: CurrentUserPayload };
+export type AuthenticatedRequest = Request & {
+  user: CurrentUserPayload;
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
@@ -29,11 +32,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   }
 
   async validate(payload: JwtPayload): Promise<CurrentUserPayload> {
-    const userId = payload.sub;
-
     const user = await this.prisma.systemUser.findUnique({
       where: {
-        id: userId,
+        id: payload.sub,
       },
       select: {
         id: true,
@@ -52,8 +53,20 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       throw new UnauthorizedException("Account is not active");
     }
 
+    if (user.type === SystemUserType.ADMIN) {
+      return {
+        ...user,
+        businessId: null,
+      };
+    }
+
+    if (!payload.businessId) {
+      throw new UnauthorizedException("No business selected");
+    }
+
     const business = await this.prisma.business.findFirst({
       where: {
+        id: payload.businessId,
         OR: [
           {
             ownerUserId: user.id,
@@ -69,26 +82,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       },
       select: {
         id: true,
-        ownerUserId: true,
-        members: {
-          where: {
-            userId: user.id,
-          },
-          select: {
-            id: true,
-            userId: true,
-          },
-        },
       },
     });
 
-    if (business) {
-      return {
-        ...user,
-        businessId: business.id,
-      };
+    if (!business) {
+      throw new UnauthorizedException("You do not have access to this store");
     }
 
-    throw new UnauthorizedException("You do not have access to this store");
+    return {
+      ...user,
+      businessId: payload.businessId,
+    };
   }
 }

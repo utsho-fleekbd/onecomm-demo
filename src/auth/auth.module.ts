@@ -7,8 +7,6 @@ import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { BusinessService } from "../business/business.service";
 
-const JWT_DEFAULT_EXPIRES_IN = "1d";
-
 @Module({
   imports: [
     PassportModule.register({
@@ -20,9 +18,7 @@ const JWT_DEFAULT_EXPIRES_IN = "1d";
       useFactory: (configService: ConfigService) => {
         const secret = configService.getOrThrow<string>("JWT_ACCESS_SECRET");
 
-        const expiresIn =
-          configService.get<string>("JWT_ACCESS_EXPIRES_IN") ??
-          JWT_DEFAULT_EXPIRES_IN;
+        const expiresIn = configService.get<string>("JWT_ACCESS_EXPIRES_IN");
 
         return {
           secret,

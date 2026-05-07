@@ -123,26 +123,26 @@ export class CreateBusinessBrandingDto {
   @MaxLength(100)
   declare fontFamily?: string;
 
-  @ApiPropertyOptional({ example: "My Business" })
+  @ApiPropertyOptional({ example: "New Business" })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   declare seoTitle?: string;
 
-  @ApiPropertyOptional({ example: "Best ecommerce business in Bangladesh" })
+  @ApiPropertyOptional({ example: "An awesome business" })
   @IsOptional()
   @IsString()
   declare seoDescription?: string;
 }
 
 export class CreateBusinessDto {
-  @ApiProperty({ example: "Matrix Store" })
+  @ApiProperty({ example: "New Business" })
   @IsString()
   @MinLength(2)
   @MaxLength(150)
   declare name: string;
 
-  @ApiPropertyOptional({ example: "matrix-store" })
+  @ApiPropertyOptional({ example: "new-business" })
   @IsOptional()
   @IsString()
   @MinLength(2)
