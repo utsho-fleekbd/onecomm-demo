@@ -13,7 +13,6 @@ import { BusinessService } from "../business/business.service";
     PassportModule.register({
       defaultStrategy: "jwt",
     }),
-
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {

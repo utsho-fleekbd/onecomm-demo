@@ -38,10 +38,16 @@ const BUSINESS_INCLUDE = {
 export class BusinessService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: number, dto: CreateBusinessDto) {
+  async create(
+    userId: number,
+    dto: CreateBusinessDto,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = tx ?? this.prisma;
+
     const slug = this.normalizeSlug(dto.slug || dto.name);
 
-    await this.ensureSlugAvailable(slug);
+    await this.ensureSlugAvailable(slug, userId);
 
     const settingsData = dto.settings
       ? this.buildBusinessSettingData(dto.settings)
@@ -52,7 +58,7 @@ export class BusinessService {
       : null;
 
     try {
-      return await this.prisma.business.create({
+      return await client.business.create({
         data: {
           name: dto.name.trim(),
           slug,
@@ -384,15 +390,11 @@ export class BusinessService {
     }
   }
 
-  private async ensureSlugAvailable(slug: string, ignoreBusinessId?: number) {
+  private async ensureSlugAvailable(slug: string, ownerUserId: number) {
     const existingBusiness = await this.prisma.business.findFirst({
       where: {
         slug,
-        ...(ignoreBusinessId && {
-          id: {
-            not: ignoreBusinessId,
-          },
-        }),
+        ownerUserId,
       },
       select: {
         id: true,

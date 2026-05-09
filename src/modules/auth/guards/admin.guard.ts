@@ -10,7 +10,7 @@ import {
 import { AuthenticatedRequest } from "../strategies/jwt.strategy";
 
 @Injectable()
-export class RequireAdmin implements CanActivate {
+export class Admin implements CanActivate {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;

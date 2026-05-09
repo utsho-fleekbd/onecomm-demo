@@ -55,32 +55,37 @@ export class AuthService {
 
     const passwordHash = await this.hashPassword(dto.password);
 
-    const user = await this.prisma.systemUser.create({
-      data: {
-        name: dto.name,
-        email,
-        passwordHash,
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.systemUser.create({
+        data: {
+          name: dto.name,
+          email,
+          passwordHash,
+          type: SystemUserType.TENANT,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          type: true,
+          status: true,
+          createdAt: true,
+        },
+      });
 
-        type: SystemUserType.TENANT,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        type: true,
-        status: true,
-        createdAt: true,
-      },
+      const selectedBusiness = await this.businessService.create(
+        user.id,
+        {
+          name: dto.businessName,
+        },
+        tx,
+      );
+
+      return {
+        user,
+        selectedBusiness,
+      };
     });
-
-    const selectedBusiness = this.businessService.create(user.id, {
-      name: dto.businessName,
-    });
-
-    return {
-      selectedBusiness,
-      user,
-    };
   }
 
   async login(dto: LoginDto) {
