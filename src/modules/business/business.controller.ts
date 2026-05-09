@@ -1,4 +1,10 @@
 import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from "@nestjs/swagger";
+import {
   Body,
   Controller,
   Delete,
@@ -10,12 +16,6 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from "@nestjs/swagger";
 
 import { BusinessService } from "./business.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
@@ -23,12 +23,12 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CreateBusinessDto } from "./dto/create-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RequireBusinessAccess } from "../auth/guards/require-business-access";
+import { BusinessAccess } from "./guards/require-business-access.guard";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 @ApiTags("Business")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RequireBusinessAccess)
+@UseGuards(JwtAuthGuard, BusinessAccess)
 @Controller("businesses")
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}

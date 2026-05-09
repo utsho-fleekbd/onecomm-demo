@@ -17,6 +17,7 @@ import { JwtPayload } from "./strategies/jwt.strategy";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SelectBusinessDto } from "./dto/select-business.dto";
+import { BusinessService } from "../business/business.service";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -35,6 +36,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly businessService: BusinessService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -53,39 +55,32 @@ export class AuthService {
 
     const passwordHash = await this.hashPassword(dto.password);
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.systemUser.create({
-        data: {
-          name: dto.name,
-          email,
-          passwordHash,
+    const user = await this.prisma.systemUser.create({
+      data: {
+        name: dto.name,
+        email,
+        passwordHash,
 
-          type: SystemUserType.TENANT,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          type: true,
-          status: true,
-          createdAt: true,
-        },
-      });
-
-      const selectedBusiness = await tx.business.create({
-        data: {
-          name: "New Business",
-          slug: "new-business",
-          ownerUserId: user.id,
-        },
-        select: this.getBusinessSelect(user.id),
-      });
-
-      return {
-        selectedBusiness,
-        user,
-      };
+        type: SystemUserType.TENANT,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        type: true,
+        status: true,
+        createdAt: true,
+      },
     });
+
+    const selectedBusiness = this.businessService.create(user.id, {
+      name: dto.businessName,
+    });
+
+    return {
+      selectedBusiness,
+      user,
+    };
   }
 
   async login(dto: LoginDto) {

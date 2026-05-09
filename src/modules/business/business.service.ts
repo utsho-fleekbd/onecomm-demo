@@ -332,10 +332,6 @@ export class BusinessService {
   private getBusinessAccessWhere(
     currentUser: CurrentUserPayload,
   ): Prisma.BusinessWhereInput {
-    if (currentUser.type === SystemUserType.ADMIN) {
-      return {};
-    }
-
     return {
       OR: [
         {
@@ -353,19 +349,25 @@ export class BusinessService {
     };
   }
 
-  private async assertCanManageBusiness(
+  async assertCanManageBusiness(
     currentUser: CurrentUserPayload,
     businessId: number,
   ) {
     const where: Prisma.BusinessWhereInput = {
       id: businessId,
       deletedAt: null,
-
-      ...(currentUser.type === SystemUserType.ADMIN
-        ? {}
-        : {
-            ownerUserId: currentUser.id,
-          }),
+      OR: [
+        {
+          ownerUserId: currentUser.id,
+        },
+        {
+          members: {
+            some: {
+              businessId,
+            },
+          },
+        },
+      ],
     };
 
     const business = await this.prisma.business.findFirst({

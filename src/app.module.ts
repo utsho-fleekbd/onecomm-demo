@@ -7,6 +7,7 @@ import { AppController } from "./app.controller";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BusinessModule } from "./modules/business/business.module";
+import { PermissionModule } from "./modules/permissions/permission.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.middleware";
 
@@ -18,6 +19,7 @@ import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.mid
     PrismaModule,
     AuthModule,
     BusinessModule,
+    PermissionModule,
   ],
   controllers: [AppController],
   providers: [
@@ -30,6 +32,6 @@ import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.mid
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestLoggerMiddleware).forRoutes("*");
+    consumer.apply(RequestLoggerMiddleware).forRoutes("*path");
   }
 }

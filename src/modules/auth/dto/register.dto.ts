@@ -26,5 +26,5 @@ export class RegisterDto {
   @ApiProperty({ example: "New Business" })
   @IsString()
   @IsOptional()
-  declare businessName?: string;
+  businessName: string = "New Business";
 }
