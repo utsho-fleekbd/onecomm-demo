@@ -1,3 +1,5 @@
+import { PermissionAction, RbacFeature } from "@prisma/client";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -10,12 +12,13 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { BusinessAccess } from "../business/guards/require-business-access.guard";
+import { BusinessGuard } from "../business/guards/business.guard";
+import { PermissionGuard } from "../permissions/guards/permission.guard";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
 
 import { AssignRoleDto } from "./dto/assign-role.dto";
 import { CreateRoleDto } from "./dto/create-role.dto";
@@ -27,11 +30,15 @@ import { RoleService } from "./role.service";
 
 @ApiTags("Roles")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessAccess)
+@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
 @Controller("roles")
 export class RoleController {
   constructor(private readonly rolesService: RoleService) {}
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.CREATE,
+  )
   @Post("businesses/:businessId")
   @ApiOperation({
     summary: "Create a role for a business",
@@ -44,6 +51,10 @@ export class RoleController {
     return this.rolesService.create(currentUser, businessId, dto);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.READ,
+  )
   @Get("businesses/:businessId")
   @ApiOperation({
     summary: "Get business roles",
@@ -56,30 +67,40 @@ export class RoleController {
     return this.rolesService.findAll(currentUser, businessId, query);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.READ,
+  )
   @Get("businesses/:businessId/assignments")
   @ApiOperation({
     summary: "Get role assignments of a business",
   })
   findAssignments(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Query() query: QueryRoleAssignmentsDto,
   ) {
-    return this.rolesService.findAssignments(currentUser, businessId, query);
+    return this.rolesService.findAssignments(businessId, query);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.READ,
+  )
   @Get("businesses/:businessId/:roleId")
   @ApiOperation({
     summary: "Get single business role",
   })
   findOne(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("roleId", ParseIntPipe) roleId: number,
   ) {
-    return this.rolesService.findOne(currentUser, businessId, roleId);
+    return this.rolesService.findOne(businessId, roleId);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @Patch("businesses/:businessId/:roleId")
   @ApiOperation({
     summary: "Update a business role",
@@ -93,6 +114,10 @@ export class RoleController {
     return this.rolesService.update(currentUser, businessId, roleId, dto);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.DELETE,
+  )
   @Delete("businesses/:businessId/:roleId")
   @ApiOperation({
     summary: "Delete a business role",
@@ -105,6 +130,10 @@ export class RoleController {
     return this.rolesService.remove(currentUser, businessId, roleId);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @Post("businesses/:businessId/:roleId/assign")
   @ApiOperation({
     summary: "Assign role to user",
@@ -118,37 +147,34 @@ export class RoleController {
     return this.rolesService.assignRole(currentUser, businessId, roleId, dto);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @Patch("businesses/:businessId/assignments/:assignmentId")
   @ApiOperation({
     summary: "Update role assignment",
   })
   updateAssignment(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("assignmentId", ParseIntPipe) assignmentId: number,
     @Body() dto: UpdateRoleAssignmentDto,
   ) {
-    return this.rolesService.updateAssignment(
-      currentUser,
-      businessId,
-      assignmentId,
-      dto,
-    );
+    return this.rolesService.updateAssignment(businessId, assignmentId, dto);
   }
 
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @Delete("businesses/:businessId/assignments/:assignmentId")
   @ApiOperation({
     summary: "Revoke role assignment",
   })
   revokeAssignment(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("assignmentId", ParseIntPipe) assignmentId: number,
   ) {
-    return this.rolesService.revokeAssignment(
-      currentUser,
-      businessId,
-      assignmentId,
-    );
+    return this.rolesService.revokeAssignment(businessId, assignmentId);
   }
 }

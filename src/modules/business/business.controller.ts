@@ -1,3 +1,4 @@
+import { PermissionAction, RbacFeature } from "@prisma/client";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -22,17 +23,20 @@ import { QueryBusinessDto } from "./dto/query-business.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CreateBusinessDto } from "./dto/create-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
+import { BusinessGuard } from "./guards/business.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { BusinessAccess } from "./guards/require-business-access.guard";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
+import { PermissionGuard } from "../permissions/guards/permission.guard";
 
 @ApiTags("Business")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessAccess)
+@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
 @Controller("businesses")
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
+  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.CREATE)
   @Post()
   @ApiOperation({ summary: "Create business" })
   create(
@@ -42,6 +46,7 @@ export class BusinessController {
     return this.businessService.create(user.id, user.type, dto);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.READ)
   @Get()
   @ApiOperation({ summary: "Get businesses" })
   findAll(
@@ -51,6 +56,7 @@ export class BusinessController {
     return this.businessService.findAll(user, query);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.READ)
   @Get(":businessId")
   @ApiOperation({ summary: "Get business details" })
   @ApiParam({ name: "businessId", example: 1 })
@@ -61,6 +67,7 @@ export class BusinessController {
     return this.businessService.findOne(user, businessId);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.UPDATE)
   @Patch(":businessId")
   @ApiOperation({ summary: "Update business" })
   @ApiParam({ name: "businessId", example: 1 })
@@ -72,6 +79,7 @@ export class BusinessController {
     return this.businessService.update(user, businessId, dto);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.DELETE)
   @Delete(":businessId")
   @ApiOperation({ summary: "Delete business" })
   @ApiParam({ name: "businessId", example: 1 })

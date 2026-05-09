@@ -7,7 +7,7 @@ enum RbacFeature {
     BUSINESS_BRANDING
 
     EMPLOYEE_MANAGEMENT
-    ROLE_MANAGEMENT
+    ROLE_PERMISSION_MANAGEMENT
 }
 
 enum PermissionAction {

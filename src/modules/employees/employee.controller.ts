@@ -23,10 +23,11 @@ import { QueryEmployeesDto } from "./dto/query-employees.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
 import { UpdateEmployeeStatusDto } from "./dto/update-employee-status.dto";
 import { EmployeeService } from "./employee.service";
+import { BusinessGuard } from "../business/guards/business.guard";
 
 @ApiTags("Employees")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, BusinessGuard)
 @Controller("employees/businesses/:businessId")
 export class EmployeeController {
   constructor(private readonly employeeService: EmployeeService) {}

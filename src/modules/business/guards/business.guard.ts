@@ -11,7 +11,7 @@ import { BusinessService } from "../business.service";
 import { AuthenticatedRequest } from "../../auth/strategies/jwt.strategy";
 
 @Injectable()
-export class BusinessAccess implements CanActivate {
+export class BusinessGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly businessService: BusinessService,

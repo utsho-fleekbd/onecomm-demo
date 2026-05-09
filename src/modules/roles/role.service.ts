@@ -94,23 +94,13 @@ const RBAC_ROLE_ASSIGNMENT_INCLUDE = {
 
 @Injectable()
 export class RoleService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly permissionService: PermissionService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(
     currentUser: CurrentUserPayload,
     businessId: number,
     dto: CreateRoleDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.CREATE,
-    );
-
     await this.assertBusinessExists(businessId);
 
     const name = this.normalizeRoleName(dto.name);
@@ -150,13 +140,6 @@ export class RoleService {
     businessId: number,
     query: QueryRoleDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -225,18 +208,7 @@ export class RoleService {
     };
   }
 
-  async findOne(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
-  ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
+  async findOne(businessId: number, roleId: number) {
     return this.getRoleOrThrow(businessId, roleId);
   }
 
@@ -246,13 +218,6 @@ export class RoleService {
     roleId: number,
     dto: UpdateRoleDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.UPDATE,
-    );
-
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     let name: string | undefined;
@@ -327,13 +292,6 @@ export class RoleService {
     businessId: number,
     roleId: number,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.DELETE,
-    );
-
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     await this.prisma.$transaction(async (tx) => {
@@ -370,13 +328,6 @@ export class RoleService {
     roleId: number,
     dto: AssignRoleDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.CREATE,
-    );
-
     await this.assertRoleBelongsToBusiness(businessId, roleId);
     await this.assertUserBelongsToBusiness(dto.userId, businessId);
     this.assertValidExpiryDate(dto.expiresAt);
@@ -420,18 +371,7 @@ export class RoleService {
     });
   }
 
-  async findAssignments(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    query: QueryRoleAssignmentsDto,
-  ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
+  async findAssignments(businessId: number, query: QueryRoleAssignmentsDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -483,18 +423,10 @@ export class RoleService {
   }
 
   async updateAssignment(
-    currentUser: CurrentUserPayload,
     businessId: number,
     assignmentId: number,
     dto: UpdateRoleAssignmentDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.UPDATE,
-    );
-
     await this.assertAssignmentBelongsToBusiness(businessId, assignmentId);
     this.assertValidExpiryDate(dto.expiresAt ?? undefined);
 
@@ -515,18 +447,7 @@ export class RoleService {
     });
   }
 
-  async revokeAssignment(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    assignmentId: number,
-  ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.DELETE,
-    );
-
+  async revokeAssignment(businessId: number, assignmentId: number) {
     await this.assertAssignmentBelongsToBusiness(businessId, assignmentId);
 
     return this.prisma.rbacUserRoleMap.update({
