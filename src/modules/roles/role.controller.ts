@@ -28,7 +28,7 @@ import { RoleService } from "./role.service";
 @ApiTags("Roles")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, BusinessAccess)
-@Controller("roles/")
+@Controller("roles")
 export class RoleController {
   constructor(private readonly rolesService: RoleService) {}
 

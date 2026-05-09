@@ -75,6 +75,7 @@ export class AuthService {
 
       const selectedBusiness = await this.businessService.create(
         user.id,
+        user.type,
         {
           name: dto.businessName,
         },

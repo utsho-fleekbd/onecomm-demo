@@ -39,7 +39,7 @@ export class BusinessController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateBusinessDto,
   ) {
-    return this.businessService.create(user.id, dto);
+    return this.businessService.create(user.id, user.type, dto);
   }
 
   @Get()

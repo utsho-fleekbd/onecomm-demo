@@ -40,9 +40,16 @@ export class BusinessService {
 
   async create(
     userId: number,
+    userType: SystemUserType,
     dto: CreateBusinessDto,
     tx?: Prisma.TransactionClient,
   ) {
+    if (userType !== SystemUserType.TENANT) {
+      throw new ForbiddenException(
+        "You do not have permission to create businesses",
+      );
+    }
+
     const client = tx ?? this.prisma;
 
     const slug = this.normalizeSlug(dto.slug || dto.name);

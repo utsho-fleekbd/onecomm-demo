@@ -8,6 +8,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RoleModule } from "./modules/roles/role.module";
 import { BusinessModule } from "./modules/business/business.module";
+import { EmployeeModule } from "./modules/employees/employee.module";
 import { PermissionModule } from "./modules/permissions/permission.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.middleware";
@@ -22,6 +23,7 @@ import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.mid
     BusinessModule,
     RoleModule,
     PermissionModule,
+    EmployeeModule,
   ],
   controllers: [AppController],
   providers: [
