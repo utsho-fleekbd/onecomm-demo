@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
-import { AuthController } from "./auth.controller";
+import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
+
 import { AuthService } from "./auth.service";
+import { AuthController } from "./auth.controller";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { BusinessService } from "../business/business.service";
 

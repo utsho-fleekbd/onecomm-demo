@@ -29,8 +29,6 @@ export class AuthController {
   }
 
   @Post("refresh")
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Refresh the current access token" })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto);

@@ -1,3 +1,4 @@
+import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
 import {
   BadRequestException,
   ConflictException,
@@ -5,7 +6,6 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
