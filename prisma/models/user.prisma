@@ -1,3 +1,34 @@
+// =======================
+// Enums
+// =======================
+
+enum SystemUserType {
+    ADMIN
+    TENANT
+    EMPLOYEE
+}
+
+enum SystemUserStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+enum Gender {
+    MALE
+    FEMALE
+    OTHER
+}
+
+enum OtpPurpose {
+    EMAIL_VERIFICATION
+    EMAIL_CHANGE
+}
+
+// =======================
+// Models
+// =======================
+
 model SystemUser {
     id              Int              @id @default(autoincrement())
     uuid            String           @unique @default(uuid()) @db.Uuid

@@ -1,3 +1,38 @@
+// =======================
+// Enums
+// =======================
+enum RbacFeature {
+    BUSINESS_PROFILE
+    BUSINESS_SETTINGS
+    BUSINESS_BRANDING
+
+    EMPLOYEE_MANAGEMENT
+    ROLE_MANAGEMENT
+}
+
+enum PermissionAction {
+    CREATE
+    READ
+    UPDATE
+    DELETE
+}
+
+enum CommonStatus {
+    ACTIVE
+    INACTIVE
+}
+
+enum UserRoleMapStatus {
+    ACTIVE
+    INACTIVE
+    EXPIRED
+    REVOKED
+}
+
+// =======================
+// Tables
+// =======================
+
 model RbacRole {
     id          Int          @id @default(autoincrement())
     businessId  Int          @map("business_id")
@@ -12,9 +47,9 @@ model RbacRole {
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
     deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-    business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-    createdBy SystemUser?      @relation("RbacRoleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-    updatedBy SystemUser?      @relation("RbacRoleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+    business  Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+    createdBy SystemUser? @relation("RbacRoleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy SystemUser? @relation("RbacRoleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
     permissions  RbacRolePermission[]
     userRoleMaps RbacUserRoleMap[]

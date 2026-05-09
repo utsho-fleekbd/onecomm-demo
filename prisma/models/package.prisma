@@ -1,5 +1,6 @@
-// prisma/schema/package.prisma
-// PACKAGE / SUBSCRIPTION MODULE
+// =======================
+// Enums
+// =======================
 
 enum PackageBillingCycle {
   FREE
@@ -35,6 +36,10 @@ enum PackageSubscriptionAddonStatus {
   EXPIRED
 }
 
+// =======================
+// Models
+// =======================
+
 model PackagePlan {
   id            String              @id @default(uuid()) @db.Uuid
   name          String              @db.VarChar(150)
@@ -49,7 +54,6 @@ model PackagePlan {
   updatedAt     DateTime            @updatedAt @map("updated_at")
   deletedAt     DateTime?           @map("deleted_at")
 
-  features      PackagePlanFeature[]
   limits        PackagePlanLimit[]
   subscriptions PackageSubscription[]
 
@@ -58,36 +62,6 @@ model PackagePlan {
   @@map("package_plans")
 }
 
-model PackageFeature {
-  id          String        @id @default(uuid()) @db.Uuid
-  name        String        @db.VarChar(150)
-  description String?
-  status      PackageStatus @default(ACTIVE)
-  sortOrder   Int           @default(0) @map("sort_order")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-
-  plans       PackagePlanFeature[]
-
-  @@unique([name])
-  @@index([status])
-  @@map("package_features")
-}
-
-model PackagePlanFeature {
-  id        String   @id @default(uuid()) @db.Uuid
-  packageId String   @map("package_id") @db.Uuid
-  featureId String   @map("feature_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  package   PackagePlan    @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  feature   PackageFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
-
-  @@unique([packageId, featureId])
-  @@index([featureId])
-  @@map("package_plan_features")
-}
 
 model PackagePlanLimit {
   id          String            @id @default(uuid()) @db.Uuid
