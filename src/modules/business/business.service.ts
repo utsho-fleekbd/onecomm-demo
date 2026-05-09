@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
 
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../../prisma/prisma.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CreateBusinessDto } from "./dto/create-business.dto";

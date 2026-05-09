@@ -1,26 +1,42 @@
+import { NextFunction, Request, Response } from "express";
 import { Injectable, Logger, NestMiddleware } from "@nestjs/common";
-import type { NextFunction, Request, Response } from "express";
+
+import { CurrentUserPayload } from "../../modules/auth/decorators/current-user.decorator";
+
+type RequestWithMeta = Request & {
+  requestId?: string;
+  user?: CurrentUserPayload;
+};
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
-  private readonly logger = new Logger(RequestLoggerMiddleware.name);
+  private readonly logger = new Logger("HTTP");
 
-  use(req: Request, res: Response, next: NextFunction) {
-    const startedAt = Date.now();
-
-    const { method, originalUrl, ip } = req;
+  use(req: RequestWithMeta, res: Response, next: NextFunction) {
+    const startedAt = process.hrtime.bigint();
 
     res.on("finish", () => {
-      const duration = Date.now() - startedAt;
+      const durationMs =
+        Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
-      const statusCode = res.statusCode;
-      const contentLength = res.getHeader("content-length") ?? 0;
+      const message = [
+        req.method,
+        req.originalUrl,
+        res.statusCode,
+        `${durationMs.toFixed(1)}ms`,
+      ].join(" ");
 
-      const userAgent = req.get("user-agent") ?? "unknown";
+      if (res.statusCode >= 500) {
+        this.logger.error(message);
+        return;
+      }
 
-      this.logger.log(
-        `\n\t\t[${method}] - ${originalUrl} - ${statusCode} \n\t\tduration: ${duration}ms - content-length: ${contentLength}b \n\t\tip: ${ip} - user-agent: ${userAgent}`,
-      );
+      if (res.statusCode >= 400) {
+        this.logger.warn(message);
+        return;
+      }
+
+      this.logger.log(message);
     });
 
     next();

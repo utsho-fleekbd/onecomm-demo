@@ -1,4 +1,4 @@
-import { AuthenticatedRequest } from "../strategies/jwt.strategy";
+import { SystemUserType } from "@prisma/client";
 import {
   CanActivate,
   ExecutionContext,
@@ -6,7 +6,8 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { SystemUserType } from "@prisma/client";
+
+import { AuthenticatedRequest } from "../strategies/jwt.strategy";
 
 @Injectable()
 export class RequireAdmin implements CanActivate {

@@ -5,7 +5,7 @@ import { PassportStrategy } from "@nestjs/passport";
 import { SystemUserStatus, SystemUserType } from "@prisma/client";
 import { ExtractJwt, Strategy } from "passport-jwt";
 
-import { PrismaService } from "../../prisma/prisma.service";
+import { PrismaService } from "../../../prisma/prisma.service";
 import { CurrentUserPayload } from "../decorators/current-user.decorator";
 
 export type JwtPayload = {

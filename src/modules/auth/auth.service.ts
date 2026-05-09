@@ -1,7 +1,7 @@
 import * as argon2 from "argon2";
-import { createHash, randomBytes } from "node:crypto";
-import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { createHash, randomBytes } from "node:crypto";
 import { SystemUser, SystemUserStatus, SystemUserType } from "@prisma/client";
 import {
   ConflictException,
@@ -11,11 +11,11 @@ import {
 } from "@nestjs/common";
 
 import { LoginDto } from "./dto/login.dto";
-import { RegisterDto } from "./dto/register.dto";
-import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { LogoutDto } from "./dto/logout.dto";
-import { PrismaService } from "../prisma/prisma.service";
+import { RegisterDto } from "./dto/register.dto";
 import { JwtPayload } from "./strategies/jwt.strategy";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { PrismaService } from "../../prisma/prisma.service";
 import { SelectBusinessDto } from "./dto/select-business.dto";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;

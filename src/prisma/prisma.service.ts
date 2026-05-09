@@ -1,13 +1,24 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
 
 @Injectable()
 export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly logger = new Logger("Prisma");
+
+  private readonly slowQueryMs = Number(process.env.SLOW_QUERY_MS ?? 300);
+  private readonly logAllQueries = process.env.PRISMA_QUERY_LOG === "true";
+  private readonly logQueryParams = process.env.PRISMA_QUERY_PARAMS === "true";
+
   constructor(configService: ConfigService) {
     const databaseUrl = configService.getOrThrow<string>("DATABASE_URL");
 
@@ -26,16 +37,47 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    await this.$connect();
+    // this.$on("query", (event) => {
+    //   const isSlowQuery = event.duration >= this.slowQueryMs;
 
-    this.$on("query" as never, (event: any) => {
-      console.log(
-        `[QUERY] \n\t\tduration: ${event.duration}ms \n\t\tquery: ${event.query} \n\t\tparams: ${event.params}`,
-      );
-    });
+    //   if (!this.logAllQueries && !isSlowQuery) {
+    //     return;
+    //   }
+
+    //   const query = this.compactSql(event.query);
+
+    //   const message = [
+    //     `${event.duration}ms`,
+    //     query,
+    //     this.logQueryParams ? `params=${event.params}` : "",
+    //   ]
+    //     .filter(Boolean)
+    //     .join(" ");
+
+    //   if (isSlowQuery) {
+    //     this.logger.warn(`Slow query: ${message}`);
+    //     return;
+    //   }
+
+    //   this.logger.debug(message);
+    // });
+
+    // this.$on("warn", (event) => {
+    //   this.logger.warn(event.message);
+    // });
+
+    // this.$on("error", (event) => {
+    //   this.logger.error(event.message);
+    // });
+
+    await this.$connect();
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
+  }
+
+  private compactSql(query: string) {
+    return query.replace(/\s+/g, " ").trim();
   }
 }

@@ -23,7 +23,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CreateBusinessDto } from "./dto/create-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RequireBusinessAccess } from "../auth/guards/requireBusinessAccess";
+import { RequireBusinessAccess } from "../auth/guards/require-business-access";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 @ApiTags("Business")
