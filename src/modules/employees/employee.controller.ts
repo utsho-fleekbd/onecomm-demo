@@ -13,9 +13,11 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { BusinessGuard } from "../business/guards/business.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { PermissionGuard } from "../permissions/guards/permission.guard";
+import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 import { AssignEmployeeRolesDto } from "./dto/assign-employee-roles.dto";
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
@@ -23,15 +25,17 @@ import { QueryEmployeesDto } from "./dto/query-employees.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
 import { UpdateEmployeeStatusDto } from "./dto/update-employee-status.dto";
 import { EmployeeService } from "./employee.service";
-import { BusinessGuard } from "../business/guards/business.guard";
+import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
+import { PermissionAction, RbacFeature } from "@prisma/client";
 
 @ApiTags("Employees")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessGuard)
+@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
 @Controller("employees/businesses/:businessId")
 export class EmployeeController {
   constructor(private readonly employeeService: EmployeeService) {}
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.CREATE)
   @Post()
   @ApiOperation({
     summary: "Create employee for a business",
@@ -44,30 +48,31 @@ export class EmployeeController {
     return this.employeeService.create(currentUser, businessId, dto);
   }
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.READ)
   @Get()
   @ApiOperation({
     summary: "Get business employees",
   })
   findAll(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Query() query: QueryEmployeesDto,
   ) {
-    return this.employeeService.findAll(currentUser, businessId, query);
+    return this.employeeService.findAll(businessId, query);
   }
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.READ)
   @Get(":employeeId")
   @ApiOperation({
     summary: "Get single employee",
   })
   findOne(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("employeeId", ParseIntPipe) employeeId: number,
   ) {
-    return this.employeeService.findOne(currentUser, businessId, employeeId);
+    return this.employeeService.findOne(businessId, employeeId);
   }
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.UPDATE)
   @Patch(":employeeId")
   @ApiOperation({
     summary: "Update employee",
@@ -86,6 +91,7 @@ export class EmployeeController {
     );
   }
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.UPDATE)
   @Patch(":employeeId/status")
   @ApiOperation({
     summary: "Update employee status",
@@ -104,6 +110,7 @@ export class EmployeeController {
     );
   }
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.UPDATE)
   @Put(":employeeId/roles")
   @ApiOperation({
     summary: "Replace employee roles for this business",
@@ -122,6 +129,7 @@ export class EmployeeController {
     );
   }
 
+  @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.DELETE)
   @Delete(":employeeId")
   @ApiOperation({
     summary: "Delete employee",

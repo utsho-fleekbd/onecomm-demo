@@ -9,7 +9,6 @@ import {
   PermissionAction,
   Prisma,
   RbacFeature,
-  SystemUserType,
   UserRoleMapStatus,
 } from "@prisma/client";
 
@@ -56,18 +55,7 @@ export class PermissionService {
     };
   }
 
-  async findAll(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    query: QueryPermissionDto,
-  ) {
-    await this.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
+  async findAll(businessId: number, query: QueryPermissionDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -116,34 +104,11 @@ export class PermissionService {
     };
   }
 
-  async findByRole(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
-  ) {
-    await this.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
+  async findByRole(businessId: number, roleId: number) {
     return this.getRoleWithPermissionsOrThrow(businessId, roleId);
   }
 
-  async addToRole(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
-    dto: AddPermissionDto,
-  ) {
-    await this.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.CREATE,
-    );
-
+  async addToRole(businessId: number, roleId: number, dto: AddPermissionDto) {
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const permissions = this.normalizePermissions(dto.permissions);
@@ -170,18 +135,10 @@ export class PermissionService {
   }
 
   async replaceRolePermissions(
-    currentUser: CurrentUserPayload,
     businessId: number,
     roleId: number,
     dto: UpdatePermissionDto,
   ) {
-    await this.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.UPDATE,
-    );
-
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const permissions = this.normalizePermissions(dto.permissions);
@@ -215,19 +172,11 @@ export class PermissionService {
   }
 
   async removeFromRole(
-    currentUser: CurrentUserPayload,
     businessId: number,
     roleId: number,
     feature: RbacFeature,
     action: PermissionAction,
   ) {
-    await this.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.DELETE,
-    );
-
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const result = await this.prisma.rbacRolePermission.deleteMany({

@@ -36,7 +36,7 @@ import { PermissionGuard } from "../permissions/guards/permission.guard";
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
-  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.CREATE)
+  @RequirePermission(RbacFeature.BUSINESS, PermissionAction.CREATE)
   @Post()
   @ApiOperation({ summary: "Create business" })
   create(
@@ -46,7 +46,7 @@ export class BusinessController {
     return this.businessService.create(user.id, user.type, dto);
   }
 
-  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.READ)
+  @RequirePermission(RbacFeature.BUSINESS, PermissionAction.READ)
   @Get()
   @ApiOperation({ summary: "Get businesses" })
   findAll(
@@ -56,7 +56,7 @@ export class BusinessController {
     return this.businessService.findAll(user, query);
   }
 
-  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.READ)
+  @RequirePermission(RbacFeature.BUSINESS, PermissionAction.READ)
   @Get(":businessId")
   @ApiOperation({ summary: "Get business details" })
   @ApiParam({ name: "businessId", example: 1 })
@@ -67,7 +67,7 @@ export class BusinessController {
     return this.businessService.findOne(user, businessId);
   }
 
-  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.UPDATE)
+  @RequirePermission(RbacFeature.BUSINESS, PermissionAction.UPDATE)
   @Patch(":businessId")
   @ApiOperation({ summary: "Update business" })
   @ApiParam({ name: "businessId", example: 1 })
@@ -79,7 +79,7 @@ export class BusinessController {
     return this.businessService.update(user, businessId, dto);
   }
 
-  @RequirePermission(RbacFeature.BUSINESS_PROFILE, PermissionAction.DELETE)
+  @RequirePermission(RbacFeature.BUSINESS, PermissionAction.DELETE)
   @Delete(":businessId")
   @ApiOperation({ summary: "Delete business" })
   @ApiParam({ name: "businessId", example: 1 })

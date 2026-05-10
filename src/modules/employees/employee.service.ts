@@ -17,43 +17,23 @@ import {
 
 import { PrismaService } from "../../prisma/prisma.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
-import { PermissionService } from "../permissions/permission.service";
 
-import { AssignEmployeeRolesDto } from "./dto/assign-employee-roles.dto";
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
 import { EmployeeProfileDto } from "./dto/employee-profile.dto";
 import { QueryEmployeesDto } from "./dto/query-employees.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
+import { AssignEmployeeRolesDto } from "./dto/assign-employee-roles.dto";
 import { UpdateEmployeeStatusDto } from "./dto/update-employee-status.dto";
 
 @Injectable()
 export class EmployeeService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly permissionService: PermissionService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(
     currentUser: CurrentUserPayload,
     businessId: number,
     dto: CreateEmployeeDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.EMPLOYEE_MANAGEMENT,
-      PermissionAction.CREATE,
-    );
-
-    if (dto.roleIds?.length) {
-      await this.permissionService.assertPermission(
-        currentUser,
-        businessId,
-        RbacFeature.ROLE_MANAGEMENT,
-        PermissionAction.CREATE,
-      );
-    }
-
     await this.assertBusinessExists(businessId);
 
     const email = this.normalizeEmail(dto.email);
@@ -122,18 +102,7 @@ export class EmployeeService {
     }
   }
 
-  async findAll(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    query: QueryEmployeesDto,
-  ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.EMPLOYEE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
+  async findAll(businessId: number, query: QueryEmployeesDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -212,18 +181,7 @@ export class EmployeeService {
     };
   }
 
-  async findOne(
-    currentUser: CurrentUserPayload,
-    businessId: number,
-    employeeId: number,
-  ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.EMPLOYEE_MANAGEMENT,
-      PermissionAction.READ,
-    );
-
+  async findOne(businessId: number, employeeId: number) {
     return this.getEmployeeByIdOrThrow(this.prisma, businessId, employeeId);
   }
 
@@ -233,13 +191,6 @@ export class EmployeeService {
     employeeId: number,
     dto: UpdateEmployeeDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.EMPLOYEE_MANAGEMENT,
-      PermissionAction.UPDATE,
-    );
-
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     const email =
@@ -313,13 +264,6 @@ export class EmployeeService {
     employeeId: number,
     dto: UpdateEmployeeStatusDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.EMPLOYEE_MANAGEMENT,
-      PermissionAction.UPDATE,
-    );
-
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     await this.prisma.systemUser.update({
@@ -341,13 +285,6 @@ export class EmployeeService {
     employeeId: number,
     dto: AssignEmployeeRolesDto,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.ROLE_MANAGEMENT,
-      PermissionAction.UPDATE,
-    );
-
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     const roleIds = this.normalizeRoleIds(dto.roleIds);
@@ -409,13 +346,6 @@ export class EmployeeService {
     businessId: number,
     employeeId: number,
   ) {
-    await this.permissionService.assertPermission(
-      currentUser,
-      businessId,
-      RbacFeature.EMPLOYEE_MANAGEMENT,
-      PermissionAction.DELETE,
-    );
-
     if (currentUser.id === employeeId) {
       throw new BadRequestException("You cannot delete your own account here");
     }

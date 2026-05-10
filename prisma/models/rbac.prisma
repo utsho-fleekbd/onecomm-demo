@@ -2,9 +2,7 @@
 // Enums
 // =======================
 enum RbacFeature {
-    BUSINESS_PROFILE
-    BUSINESS_SETTINGS
-    BUSINESS_BRANDING
+    BUSINESS
 
     EMPLOYEE_MANAGEMENT
     ROLE_PERMISSION_MANAGEMENT

@@ -5,7 +5,7 @@ import { PermissionAction, RbacFeature } from "@prisma/client";
 export class PermissionItemDto {
   @ApiProperty({
     enum: RbacFeature,
-    example: RbacFeature.ROLE_MANAGEMENT,
+    example: RbacFeature.BUSINESS,
   })
   @IsEnum(RbacFeature)
   declare feature: RbacFeature;
