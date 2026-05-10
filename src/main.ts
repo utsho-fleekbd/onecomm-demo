@@ -1,10 +1,14 @@
-import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    logger: ["error", "warn", "log", "debug", "verbose"],
+  });
 
   app.enableCors({
     origin: "*",
@@ -49,8 +53,10 @@ async function bootstrap() {
 
   await app.listen(port, ip);
 
-  console.log(`Server running on http://${ip}:${port}/api/v1`);
-  console.log(`Swagger running on http://${ip}:${port}/api/v1/docs`);
+  const logger = new Logger("Bootstrap");
+
+  logger.log(`Server running on http://${ip}:${port}/api/v1`);
+  logger.log(`Swagger running on http://${ip}:${port}/api/v1/docs`);
 }
 
 bootstrap();

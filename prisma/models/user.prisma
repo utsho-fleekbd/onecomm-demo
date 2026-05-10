@@ -39,6 +39,7 @@ model SystemUser {
     type            SystemUserType  
     status          SystemUserStatus @default(ACTIVE)
     emailVerifiedAt DateTime?        @map("email_verified_at") @db.Timestamptz(6)
+    // TODO: add tenant id (nullable)
 
     createdById Int? @map("created_by")
     updatedById Int? @map("updated_by")
