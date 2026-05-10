@@ -1,5 +1,6 @@
 import { Reflector } from "@nestjs/core";
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -9,6 +10,11 @@ import {
 
 import { BusinessService } from "../business.service";
 import { AuthenticatedRequest } from "../../auth/strategies/jwt.strategy";
+import {
+  REQUIRED_PERMISSION_KEY,
+  RequiredPermissionMeta,
+} from "../../permissions/decorators/require-permission.decorator";
+import { SystemUserType } from "@prisma/client";
 
 @Injectable()
 export class BusinessGuard implements CanActivate {
@@ -25,12 +31,52 @@ export class BusinessGuard implements CanActivate {
       throw new UnauthorizedException("Unauthorized");
     }
 
-    if (!user.businessId) {
+    const businessId = this.getTargetBusinessId(context, request);
+
+    if (businessId === null) {
+      request.businessId = null;
+
+      return true;
+    }
+
+    await this.businessService.assertCanAccessBusiness(user, businessId);
+
+    request.businessId = businessId;
+
+    return true;
+  }
+
+  private getTargetBusinessId(
+    context: ExecutionContext,
+    request: AuthenticatedRequest,
+  ) {
+    const requiredPermission =
+      this.reflector.getAllAndOverride<RequiredPermissionMeta>(
+        REQUIRED_PERMISSION_KEY,
+        [context.getHandler(), context.getClass()],
+      );
+
+    const businessIdParam = requiredPermission?.businessIdParam ?? "businessId";
+    const rawParam = request.params?.[businessIdParam];
+
+    if (rawParam !== undefined) {
+      const businessId = Number(rawParam);
+
+      if (!Number.isInteger(businessId) || businessId <= 0) {
+        throw new BadRequestException("Invalid business ID");
+      }
+
+      return businessId;
+    }
+
+    if (request.user.type === SystemUserType.ADMIN) {
+      return null;
+    }
+
+    if (!request.user.businessId) {
       throw new ForbiddenException("You do not have access to this business");
     }
 
-    await this.businessService.assertCanManageBusiness(user, user.businessId);
-
-    return true;
+    return request.user.businessId;
   }
 }

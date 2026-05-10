@@ -1,4 +1,9 @@
-import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
+import {
+  BusinessMemberStatus,
+  BusinessStatus,
+  Prisma,
+  SystemUserType,
+} from "@prisma/client";
 import {
   BadRequestException,
   ConflictException,
@@ -33,6 +38,11 @@ const BUSINESS_INCLUDE = {
     },
   },
 } satisfies Prisma.BusinessInclude;
+
+const ACCESSIBLE_BUSINESS_STATUSES = [
+  BusinessStatus.TRIAL,
+  BusinessStatus.ACTIVE,
+] satisfies BusinessStatus[];
 
 @Injectable()
 export class BusinessService {
@@ -117,16 +127,81 @@ export class BusinessService {
     const canIncludeDeleted =
       currentUser.type === SystemUserType.ADMIN && query.includeDeleted;
 
+    const searchWhere: Prisma.BusinessWhereInput | undefined = query.search
+      ? {
+          OR: [
+            {
+              name: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              slug: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              phone: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              country: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        }
+      : undefined;
+
+    const statusWhere: Prisma.BusinessWhereInput =
+      currentUser.type === SystemUserType.ADMIN
+        ? {
+            ...(query.status && {
+              status: query.status,
+            }),
+          }
+        : {
+            ...(query.status
+              ? {
+                  AND: [
+                    {
+                      status: {
+                        in: ACCESSIBLE_BUSINESS_STATUSES,
+                      },
+                    },
+                    {
+                      status: query.status,
+                    },
+                  ],
+                }
+              : {
+                  status: {
+                    in: ACCESSIBLE_BUSINESS_STATUSES,
+                  },
+                }),
+          };
+
     const where: Prisma.BusinessWhereInput = {
       ...(!canIncludeDeleted && {
         deletedAt: null,
       }),
 
-      ...this.getBusinessAccessWhere(currentUser),
-
-      ...(query.status && {
-        status: query.status,
-      }),
+      AND: [
+        this.getBusinessAccessWhere(currentUser),
+        statusWhere,
+        ...(searchWhere ? [searchWhere] : []),
+      ],
 
       ...(query.country && {
         country: {
@@ -140,41 +215,6 @@ export class BusinessService {
           equals: query.currencyCode,
           mode: "insensitive",
         },
-      }),
-
-      ...(query.search && {
-        OR: [
-          {
-            name: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            slug: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            email: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            phone: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            country: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-        ],
       }),
     };
 
@@ -231,11 +271,24 @@ export class BusinessService {
   ) {
     await this.assertCanManageBusiness(currentUser, businessId);
 
+    const business = await this.prisma.business.findUnique({
+      where: {
+        id: businessId,
+      },
+      select: {
+        ownerUserId: true,
+      },
+    });
+
     let slug: string | undefined;
 
     if (dto.slug !== undefined) {
       slug = this.normalizeSlug(dto.slug);
-      await this.ensureSlugAvailable(slug, businessId);
+      await this.ensureSlugAvailable(
+        slug,
+        business?.ownerUserId ?? currentUser.id,
+        businessId,
+      );
     }
 
     const settingData = dto.settings
@@ -345,6 +398,10 @@ export class BusinessService {
   private getBusinessAccessWhere(
     currentUser: CurrentUserPayload,
   ): Prisma.BusinessWhereInput {
+    if (currentUser.type === SystemUserType.ADMIN) {
+      return {};
+    }
+
     return {
       OR: [
         {
@@ -354,6 +411,7 @@ export class BusinessService {
           members: {
             some: {
               userId: currentUser.id,
+              status: BusinessMemberStatus.ACTIVE,
               deletedAt: null,
             },
           },
@@ -362,25 +420,19 @@ export class BusinessService {
     };
   }
 
-  async assertCanManageBusiness(
+  async assertCanAccessBusiness(
     currentUser: CurrentUserPayload,
     businessId: number,
   ) {
     const where: Prisma.BusinessWhereInput = {
       id: businessId,
       deletedAt: null,
-      OR: [
-        {
-          ownerUserId: currentUser.id,
+      ...(currentUser.type !== SystemUserType.ADMIN && {
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
         },
-        {
-          members: {
-            some: {
-              businessId,
-            },
-          },
-        },
-      ],
+        ...this.getBusinessAccessWhere(currentUser),
+      }),
     };
 
     const business = await this.prisma.business.findFirst({
@@ -397,11 +449,27 @@ export class BusinessService {
     }
   }
 
-  private async ensureSlugAvailable(slug: string, ownerUserId: number) {
+  async assertCanManageBusiness(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+  ) {
+    return this.assertCanAccessBusiness(currentUser, businessId);
+  }
+
+  private async ensureSlugAvailable(
+    slug: string,
+    ownerUserId: number,
+    ignoreBusinessId?: number,
+  ) {
     const existingBusiness = await this.prisma.business.findFirst({
       where: {
         slug,
         ownerUserId,
+        ...(ignoreBusinessId !== undefined && {
+          id: {
+            not: ignoreBusinessId,
+          },
+        }),
       },
       select: {
         id: true,

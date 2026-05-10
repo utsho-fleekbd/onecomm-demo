@@ -6,7 +6,7 @@ export const REQUIRED_PERMISSION_KEY = "required_permission";
 export type RequiredPermissionMeta = {
   feature: RbacFeature;
   action: PermissionAction;
-  businessIdParam?: string;
+  businessIdParam: string;
 };
 
 export const RequirePermission = (

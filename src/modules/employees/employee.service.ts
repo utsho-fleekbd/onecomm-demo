@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  BusinessMemberStatus,
   CommonStatus,
   PermissionAction,
   Prisma,
@@ -16,6 +17,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import { BusinessService } from "../business/business.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
@@ -27,14 +29,17 @@ import { UpdateEmployeeStatusDto } from "./dto/update-employee-status.dto";
 
 @Injectable()
 export class EmployeeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly businessService: BusinessService,
+  ) {}
 
   async create(
     currentUser: CurrentUserPayload,
     businessId: number,
     dto: CreateEmployeeDto,
   ) {
-    await this.assertBusinessExists(businessId);
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
     const email = this.normalizeEmail(dto.email);
     const phone = this.normalizeNullableText(dto.phone);
@@ -102,7 +107,13 @@ export class EmployeeService {
     }
   }
 
-  async findAll(businessId: number, query: QueryEmployeesDto) {
+  async findAll(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    query: QueryEmployeesDto,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -116,6 +127,7 @@ export class EmployeeService {
       businessMembers: {
         some: {
           businessId,
+          status: BusinessMemberStatus.ACTIVE,
           deletedAt: null,
         },
       },
@@ -181,7 +193,13 @@ export class EmployeeService {
     };
   }
 
-  async findOne(businessId: number, employeeId: number) {
+  async findOne(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    employeeId: number,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     return this.getEmployeeByIdOrThrow(this.prisma, businessId, employeeId);
   }
 
@@ -191,6 +209,7 @@ export class EmployeeService {
     employeeId: number,
     dto: UpdateEmployeeDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     const email =
@@ -264,6 +283,7 @@ export class EmployeeService {
     employeeId: number,
     dto: UpdateEmployeeStatusDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     await this.prisma.systemUser.update({
@@ -285,6 +305,7 @@ export class EmployeeService {
     employeeId: number,
     dto: AssignEmployeeRolesDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     const roleIds = this.normalizeRoleIds(dto.roleIds);
@@ -350,9 +371,12 @@ export class EmployeeService {
       throw new BadRequestException("You cannot delete your own account here");
     }
 
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+
       await tx.businessMember.updateMany({
         where: {
           businessId,
@@ -360,7 +384,8 @@ export class EmployeeService {
           deletedAt: null,
         },
         data: {
-          deletedAt: new Date(),
+          status: BusinessMemberStatus.INACTIVE,
+          deletedAt: now,
         },
       });
 
@@ -377,13 +402,25 @@ export class EmployeeService {
         },
       });
 
+      const activeMemberships = await tx.businessMember.count({
+        where: {
+          userId: employeeId,
+          status: BusinessMemberStatus.ACTIVE,
+          deletedAt: null,
+        },
+      });
+
+      if (activeMemberships > 0) {
+        return;
+      }
+
       await tx.systemUserProfile.updateMany({
         where: {
           userId: employeeId,
           deletedAt: null,
         },
         data: {
-          deletedAt: new Date(),
+          deletedAt: now,
         },
       });
 
@@ -393,7 +430,7 @@ export class EmployeeService {
         },
         data: {
           status: SystemUserStatus.INACTIVE,
-          deletedAt: new Date(),
+          deletedAt: now,
           deletedById: currentUser.id,
           updatedById: currentUser.id,
         },
@@ -437,6 +474,8 @@ export class EmployeeService {
       businessMembers: {
         where: {
           businessId,
+          status: BusinessMemberStatus.ACTIVE,
+          deletedAt: null,
         },
         select: {
           id: true,
@@ -513,6 +552,7 @@ export class EmployeeService {
         businessMembers: {
           some: {
             businessId,
+            status: BusinessMemberStatus.ACTIVE,
             deletedAt: null,
           },
         },
@@ -527,22 +567,6 @@ export class EmployeeService {
     return employee;
   }
 
-  private async assertBusinessExists(businessId: number) {
-    const business = await this.prisma.business.findFirst({
-      where: {
-        id: businessId,
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!business) {
-      throw new NotFoundException("Business not found");
-    }
-  }
-
   private async assertEmployeeBelongsToBusiness(
     businessId: number,
     employeeId: number,
@@ -555,6 +579,7 @@ export class EmployeeService {
         businessMembers: {
           some: {
             businessId,
+            status: BusinessMemberStatus.ACTIVE,
             deletedAt: null,
           },
         },

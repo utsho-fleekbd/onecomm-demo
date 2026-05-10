@@ -11,11 +11,11 @@ export class UpdatePermissionDto {
       "Full replacement list. Send an empty array to remove all permissions from the role.",
     example: [
       {
-        feature: "ROLE_MANAGEMENT",
+        feature: "ROLE_PERMISSION_MANAGEMENT",
         action: "READ",
       },
       {
-        feature: "ROLE_MANAGEMENT",
+        feature: "ROLE_PERMISSION_MANAGEMENT",
         action: "UPDATE",
       },
     ],

@@ -22,6 +22,9 @@ import {
 import { PermissionGuard } from "./guards/permission.guard";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { BusinessGuard } from "../business/guards/business.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { RequirePermission } from "./decorators/require-permission.decorator";
+import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 import { AddPermissionDto } from "./dto/add-permission";
 import { PermissionService } from "./permission.service";
@@ -44,51 +47,77 @@ export class PermissionController {
   }
 
   @Get("businesses/:businessId")
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.READ,
+  )
   @ApiOperation({
     summary: "Get all role permissions for a business",
   })
   findAll(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Query() query: QueryPermissionDto,
   ) {
-    return this.permissionsService.findAll(businessId, query);
+    return this.permissionsService.findAll(currentUser, businessId, query);
   }
 
   @Get("businesses/:businessId/roles/:roleId")
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.READ,
+  )
   @ApiOperation({
     summary: "Get permissions of a specific role",
   })
   findByRole(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("roleId", ParseIntPipe) roleId: number,
   ) {
-    return this.permissionsService.findByRole(businessId, roleId);
+    return this.permissionsService.findByRole(currentUser, businessId, roleId);
   }
 
   @Post("businesses/:businessId/roles/:roleId")
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @ApiOperation({
     summary: "Add permissions to a role",
   })
   addToRole(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("roleId", ParseIntPipe) roleId: number,
     @Body() dto: AddPermissionDto,
   ) {
-    return this.permissionsService.addToRole(businessId, roleId, dto);
+    return this.permissionsService.addToRole(
+      currentUser,
+      businessId,
+      roleId,
+      dto,
+    );
   }
 
   @Put("businesses/:businessId/roles/:roleId")
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @ApiOperation({
     summary: "Replace all permissions of a role",
     description:
       "This removes old permissions first, then inserts the new permission list.",
   })
   replaceRolePermissions(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("roleId", ParseIntPipe) roleId: number,
     @Body() dto: UpdatePermissionDto,
   ) {
     return this.permissionsService.replaceRolePermissions(
+      currentUser,
       businessId,
       roleId,
       dto,
@@ -96,6 +125,10 @@ export class PermissionController {
   }
 
   @Delete("businesses/:businessId/roles/:roleId/:feature/:action")
+  @RequirePermission(
+    RbacFeature.ROLE_PERMISSION_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
   @ApiOperation({
     summary: "Remove a single permission from a role",
   })
@@ -108,6 +141,7 @@ export class PermissionController {
     enum: PermissionAction,
   })
   removeFromRole(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("roleId", ParseIntPipe) roleId: number,
     @Param("feature", new ParseEnumPipe(RbacFeature)) feature: RbacFeature,
@@ -115,6 +149,7 @@ export class PermissionController {
     action: PermissionAction,
   ) {
     return this.permissionsService.removeFromRole(
+      currentUser,
       businessId,
       roleId,
       feature,

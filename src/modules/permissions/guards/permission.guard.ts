@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { Reflector } from "@nestjs/core";
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -14,9 +15,11 @@ import {
   REQUIRED_PERMISSION_KEY,
   RequiredPermissionMeta,
 } from "../decorators/require-permission.decorator";
+import { SystemUserType } from "@prisma/client";
 
 type AuthenticatedRequest = Request & {
   user?: CurrentUserPayload;
+  businessId?: number | null;
 };
 
 @Injectable()
@@ -45,17 +48,50 @@ export class PermissionGuard implements CanActivate {
       throw new UnauthorizedException("Unauthorized");
     }
 
-    if (!user.businessId) {
-      throw new ForbiddenException("You do not have access to this business");
+    const businessId = this.getTargetBusinessId(request, requiredPermission);
+
+    if (businessId === null) {
+      request.businessId = null;
+
+      return true;
     }
 
     await this.permissionService.assertPermission(
       user,
-      user.businessId,
+      businessId,
       requiredPermission.feature,
       requiredPermission.action,
     );
 
+    request.businessId = businessId;
+
     return true;
+  }
+
+  private getTargetBusinessId(
+    request: AuthenticatedRequest,
+    requiredPermission: RequiredPermissionMeta,
+  ) {
+    const rawParam = request.params?.[requiredPermission.businessIdParam];
+
+    if (rawParam !== undefined) {
+      const businessId = Number(rawParam);
+
+      if (!Number.isInteger(businessId) || businessId <= 0) {
+        throw new BadRequestException("Invalid business ID");
+      }
+
+      return businessId;
+    }
+
+    if (request.user?.type === SystemUserType.ADMIN) {
+      return null;
+    }
+
+    if (!request.user?.businessId) {
+      throw new ForbiddenException("You do not have access to this business");
+    }
+
+    return request.user.businessId;
   }
 }

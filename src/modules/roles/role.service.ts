@@ -6,16 +6,19 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  BusinessMemberStatus,
+  BusinessStatus,
   CommonStatus,
   PermissionAction,
   Prisma,
   RbacFeature,
+  SystemUserStatus,
   SystemUserType,
   UserRoleMapStatus,
 } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
-import { PermissionService } from "../permissions/permission.service";
+import { BusinessService } from "../business/business.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 
 import { AssignRoleDto } from "./dto/assign-role.dto";
@@ -25,6 +28,11 @@ import { QueryRoleDto } from "./dto/query-role.dto";
 import { RolePermissionDto } from "./dto/role-permission.dto";
 import { UpdateRoleDto } from "./dto/update-role.dto";
 import { UpdateRoleAssignmentDto } from "./dto/update-role-assignment.dto";
+
+const ACCESSIBLE_BUSINESS_STATUSES = [
+  BusinessStatus.TRIAL,
+  BusinessStatus.ACTIVE,
+] satisfies BusinessStatus[];
 
 const RBAC_ROLE_INCLUDE = {
   createdBy: {
@@ -94,14 +102,17 @@ const RBAC_ROLE_ASSIGNMENT_INCLUDE = {
 
 @Injectable()
 export class RoleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly businessService: BusinessService,
+  ) {}
 
   async create(
     currentUser: CurrentUserPayload,
     businessId: number,
     dto: CreateRoleDto,
   ) {
-    await this.assertBusinessExists(businessId);
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
     const name = this.normalizeRoleName(dto.name);
     await this.ensureRoleNameAvailable(businessId, name);
@@ -140,6 +151,8 @@ export class RoleService {
     businessId: number,
     query: QueryRoleDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -208,7 +221,13 @@ export class RoleService {
     };
   }
 
-  async findOne(businessId: number, roleId: number) {
+  async findOne(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    roleId: number,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     return this.getRoleOrThrow(businessId, roleId);
   }
 
@@ -218,6 +237,7 @@ export class RoleService {
     roleId: number,
     dto: UpdateRoleDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     let name: string | undefined;
@@ -292,6 +312,7 @@ export class RoleService {
     businessId: number,
     roleId: number,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     await this.prisma.$transaction(async (tx) => {
@@ -328,6 +349,7 @@ export class RoleService {
     roleId: number,
     dto: AssignRoleDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
     await this.assertUserBelongsToBusiness(dto.userId, businessId);
     this.assertValidExpiryDate(dto.expiresAt);
@@ -371,7 +393,13 @@ export class RoleService {
     });
   }
 
-  async findAssignments(businessId: number, query: QueryRoleAssignmentsDto) {
+  async findAssignments(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    query: QueryRoleAssignmentsDto,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -423,10 +451,12 @@ export class RoleService {
   }
 
   async updateAssignment(
+    currentUser: CurrentUserPayload,
     businessId: number,
     assignmentId: number,
     dto: UpdateRoleAssignmentDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertAssignmentBelongsToBusiness(businessId, assignmentId);
     this.assertValidExpiryDate(dto.expiresAt ?? undefined);
 
@@ -447,7 +477,12 @@ export class RoleService {
     });
   }
 
-  async revokeAssignment(businessId: number, assignmentId: number) {
+  async revokeAssignment(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    assignmentId: number,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertAssignmentBelongsToBusiness(businessId, assignmentId);
 
     return this.prisma.rbacUserRoleMap.update({
@@ -476,22 +511,6 @@ export class RoleService {
     }
 
     return role;
-  }
-
-  private async assertBusinessExists(businessId: number) {
-    const business = await this.prisma.business.findFirst({
-      where: {
-        id: businessId,
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!business) {
-      throw new NotFoundException("Business not found");
-    }
   }
 
   private async assertRoleBelongsToBusiness(
@@ -543,6 +562,8 @@ export class RoleService {
     const user = await this.prisma.systemUser.findFirst({
       where: {
         id: userId,
+        status: SystemUserStatus.ACTIVE,
+        deletedAt: null,
       },
       select: {
         id: true,
@@ -557,6 +578,9 @@ export class RoleService {
       where: {
         id: businessId,
         deletedAt: null,
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
 
         OR: [
           {
@@ -566,6 +590,7 @@ export class RoleService {
             members: {
               some: {
                 userId,
+                status: BusinessMemberStatus.ACTIVE,
                 deletedAt: null,
               },
             },

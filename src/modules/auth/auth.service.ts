@@ -2,7 +2,13 @@ import * as argon2 from "argon2";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes } from "node:crypto";
-import { SystemUser, SystemUserStatus, SystemUserType } from "@prisma/client";
+import {
+  BusinessMemberStatus,
+  BusinessStatus,
+  SystemUser,
+  SystemUserStatus,
+  SystemUserType,
+} from "@prisma/client";
 import {
   ConflictException,
   ForbiddenException,
@@ -29,6 +35,11 @@ type AuthBusiness = {
     userId: number;
   }[];
 };
+
+const ACCESSIBLE_BUSINESS_STATUSES = [
+  BusinessStatus.TRIAL,
+  BusinessStatus.ACTIVE,
+] satisfies BusinessStatus[];
 
 @Injectable()
 export class AuthService {
@@ -448,6 +459,10 @@ export class AuthService {
     return this.prisma.business.findFirst({
       where: {
         id: businessId,
+        deletedAt: null,
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
         OR: [
           {
             ownerUserId: userId,
@@ -456,6 +471,8 @@ export class AuthService {
             members: {
               some: {
                 userId,
+                status: BusinessMemberStatus.ACTIVE,
+                deletedAt: null,
               },
             },
           },
@@ -470,6 +487,10 @@ export class AuthService {
   ): Promise<AuthBusiness[]> {
     return this.prisma.business.findMany({
       where: {
+        deletedAt: null,
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
         OR: [
           {
             ownerUserId: userId,
@@ -478,6 +499,8 @@ export class AuthService {
             members: {
               some: {
                 userId,
+                status: BusinessMemberStatus.ACTIVE,
+                deletedAt: null,
               },
             },
           },
@@ -497,7 +520,7 @@ export class AuthService {
   ) {
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
-    await this.prisma.systemSession.updateMany({
+    const result = await this.prisma.systemSession.updateMany({
       where: {
         userId,
         refreshTokenHash,
@@ -510,6 +533,10 @@ export class AuthService {
         businessId,
       },
     });
+
+    if (result.count !== 1) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
   }
 
   private async revokeAllUserSessions(userId: number) {
@@ -532,6 +559,8 @@ export class AuthService {
       members: {
         where: {
           userId,
+          status: BusinessMemberStatus.ACTIVE,
+          deletedAt: null,
         },
       },
     } as const;

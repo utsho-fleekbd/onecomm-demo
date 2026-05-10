@@ -9,11 +9,13 @@ import {
   PermissionAction,
   Prisma,
   RbacFeature,
+  SystemUserType,
   UserRoleMapStatus,
 } from "@prisma/client";
 
 import { AddPermissionDto } from "./dto/add-permission";
 import { PrismaService } from "../../prisma/prisma.service";
+import { BusinessService } from "../business/business.service";
 import { PermissionItemDto } from "./dto/permission-item.dto";
 import { QueryPermissionDto } from "./dto/query-permission.dto";
 import { UpdatePermissionDto } from "./dto/update-permission.dto";
@@ -43,7 +45,10 @@ const ROLE_WITH_PERMISSIONS_INCLUDE = {
 
 @Injectable()
 export class PermissionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly businessService: BusinessService,
+  ) {}
 
   getAvailablePermissions() {
     return {
@@ -55,7 +60,13 @@ export class PermissionService {
     };
   }
 
-  async findAll(businessId: number, query: QueryPermissionDto) {
+  async findAll(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    query: QueryPermissionDto,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -104,11 +115,23 @@ export class PermissionService {
     };
   }
 
-  async findByRole(businessId: number, roleId: number) {
+  async findByRole(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    roleId: number,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     return this.getRoleWithPermissionsOrThrow(businessId, roleId);
   }
 
-  async addToRole(businessId: number, roleId: number, dto: AddPermissionDto) {
+  async addToRole(
+    currentUser: CurrentUserPayload,
+    businessId: number,
+    roleId: number,
+    dto: AddPermissionDto,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const permissions = this.normalizePermissions(dto.permissions);
@@ -135,10 +158,12 @@ export class PermissionService {
   }
 
   async replaceRolePermissions(
+    currentUser: CurrentUserPayload,
     businessId: number,
     roleId: number,
     dto: UpdatePermissionDto,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const permissions = this.normalizePermissions(dto.permissions);
@@ -172,11 +197,13 @@ export class PermissionService {
   }
 
   async removeFromRole(
+    currentUser: CurrentUserPayload,
     businessId: number,
     roleId: number,
     feature: RbacFeature,
     action: PermissionAction,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const result = await this.prisma.rbacRolePermission.deleteMany({
@@ -200,6 +227,8 @@ export class PermissionService {
     feature: RbacFeature,
     action: PermissionAction,
   ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
     const isOwner = await this.isBusinessOwner(currentUser.id, businessId);
 
     if (isOwner) {

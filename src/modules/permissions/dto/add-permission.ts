@@ -9,11 +9,11 @@ export class AddPermissionDto {
     type: [PermissionItemDto],
     example: [
       {
-        feature: "BUSINESS_PROFILE",
+        feature: "BUSINESS",
         action: "READ",
       },
       {
-        feature: "BUSINESS_PROFILE",
+        feature: "BUSINESS",
         action: "UPDATE",
       },
     ],

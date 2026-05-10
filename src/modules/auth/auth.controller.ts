@@ -57,8 +57,8 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Logout current session" })
-  logout(@Body() dto: LogoutDto) {
-    return this.authService.logout(dto);
+  logout(@CurrentUser() user: CurrentUserPayload, @Body() dto: LogoutDto) {
+    return this.authService.logout(dto, user.id);
   }
 
   @Post("logout-all")

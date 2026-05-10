@@ -54,10 +54,11 @@ export class EmployeeController {
     summary: "Get business employees",
   })
   findAll(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Query() query: QueryEmployeesDto,
   ) {
-    return this.employeeService.findAll(businessId, query);
+    return this.employeeService.findAll(currentUser, businessId, query);
   }
 
   @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.READ)
@@ -66,10 +67,11 @@ export class EmployeeController {
     summary: "Get single employee",
   })
   findOne(
+    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseIntPipe) businessId: number,
     @Param("employeeId", ParseIntPipe) employeeId: number,
   ) {
-    return this.employeeService.findOne(businessId, employeeId);
+    return this.employeeService.findOne(currentUser, businessId, employeeId);
   }
 
   @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.UPDATE)

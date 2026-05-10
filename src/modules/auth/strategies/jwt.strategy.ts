@@ -1,12 +1,22 @@
 import { Request } from "express";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
-import { SystemUserStatus, SystemUserType } from "@prisma/client";
 import { ExtractJwt, Strategy } from "passport-jwt";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  BusinessMemberStatus,
+  BusinessStatus,
+  SystemUserStatus,
+  SystemUserType,
+} from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CurrentUserPayload } from "../decorators/current-user.decorator";
+
+const ACCESSIBLE_BUSINESS_STATUSES = [
+  BusinessStatus.TRIAL,
+  BusinessStatus.ACTIVE,
+] satisfies BusinessStatus[];
 
 export type JwtPayload = {
   sub: number;
@@ -16,6 +26,7 @@ export type JwtPayload = {
 
 export type AuthenticatedRequest = Request & {
   user: CurrentUserPayload;
+  businessId?: number | null;
 };
 
 @Injectable()
@@ -53,6 +64,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       throw new UnauthorizedException("Account is not active");
     }
 
+    if (payload.type !== user.type) {
+      throw new UnauthorizedException("Invalid token");
+    }
+
     if (user.type === SystemUserType.ADMIN) {
       return {
         ...user,
@@ -67,6 +82,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     const business = await this.prisma.business.findFirst({
       where: {
         id: payload.businessId,
+        deletedAt: null,
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
         OR: [
           {
             ownerUserId: user.id,
@@ -75,6 +94,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
             members: {
               some: {
                 userId: user.id,
+                status: BusinessMemberStatus.ACTIVE,
+                deletedAt: null,
               },
             },
           },

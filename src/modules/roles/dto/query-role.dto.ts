@@ -8,6 +8,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   Min,
 } from "class-validator";
 
@@ -17,14 +18,15 @@ export class QueryRoleDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number;
+  page?: number = 1;
 
   @ApiPropertyOptional({ example: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number;
+  @Max(100)
+  limit?: number = 20;
 
   @ApiPropertyOptional({ example: "manager" })
   @IsOptional()
