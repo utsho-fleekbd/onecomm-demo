@@ -27,7 +27,7 @@ export class QueryPermissionDto {
 
   @ApiPropertyOptional({
     enum: RbacFeature,
-    example: RbacFeature.BUSINESS,
+    example: RbacFeature.BUSINESS_MANAGEMENT,
   })
   @IsOptional()
   @IsEnum(RbacFeature)
