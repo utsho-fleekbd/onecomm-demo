@@ -115,7 +115,7 @@ export class EmployeeService {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const sortBy = query.sortBy ?? "createdAt";

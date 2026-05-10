@@ -11,7 +11,7 @@ export class QueryRoleAssignmentsDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional({ example: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

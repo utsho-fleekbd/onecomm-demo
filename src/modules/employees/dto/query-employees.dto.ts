@@ -20,13 +20,13 @@ export class QueryEmployeesDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional({ example: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number = 20;
+  limit?: number = 10;
 
   @ApiPropertyOptional({ example: "john" })
   @IsOptional()
