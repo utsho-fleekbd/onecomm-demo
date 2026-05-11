@@ -11,7 +11,7 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -59,10 +59,13 @@ export class BusinessController {
   @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.READ)
   @Get(":businessId")
   @ApiOperation({ summary: "Get business details" })
-  @ApiParam({ name: "businessId", example: 1 })
+  @ApiParam({
+    name: "businessId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
   findOne(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
   ) {
     return this.businessService.findOne(user, businessId);
   }
@@ -70,10 +73,13 @@ export class BusinessController {
   @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.UPDATE)
   @Patch(":businessId")
   @ApiOperation({ summary: "Update business" })
-  @ApiParam({ name: "businessId", example: 1 })
+  @ApiParam({
+    name: "businessId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
   update(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: UpdateBusinessDto,
   ) {
     return this.businessService.update(user, businessId, dto);
@@ -82,10 +88,13 @@ export class BusinessController {
   @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.DELETE)
   @Delete(":businessId")
   @ApiOperation({ summary: "Delete business" })
-  @ApiParam({ name: "businessId", example: 1 })
+  @ApiParam({
+    name: "businessId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
   remove(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
   ) {
     return this.businessService.remove(user, businessId);
   }

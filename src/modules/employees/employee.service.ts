@@ -19,6 +19,10 @@ import {
 import { PrismaService } from "../../prisma/prisma.service";
 import { BusinessService } from "../business/business.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import {
+  apiResponse,
+  paginatedResponse,
+} from "../../common/utils/api-response.util";
 
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
 import { EmployeeProfileDto } from "./dto/employee-profile.dto";
@@ -36,7 +40,7 @@ export class EmployeeService {
 
   async create(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     dto: CreateEmployeeDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -100,7 +104,13 @@ export class EmployeeService {
           });
         }
 
-        return this.getEmployeeByIdOrThrow(tx, businessId, employee.id);
+        const createdEmployee = await this.getEmployeeByIdOrThrow(
+          tx,
+          businessId,
+          employee.id,
+        );
+
+        return apiResponse(createdEmployee, "Employee created successfully");
       });
     } catch (error) {
       this.handlePrismaError(error);
@@ -109,7 +119,7 @@ export class EmployeeService {
 
   async findAll(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     query: QueryEmployeesDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -182,31 +192,34 @@ export class EmployeeService {
       }),
     ]);
 
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      items,
-    };
+    return paginatedResponse(items, {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
   async findOne(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
-    return this.getEmployeeByIdOrThrow(this.prisma, businessId, employeeId);
+    const employee = await this.getEmployeeByIdOrThrow(
+      this.prisma,
+      businessId,
+      employeeId,
+    );
+
+    return apiResponse(employee);
   }
 
   async update(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
     dto: UpdateEmployeeDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -270,7 +283,13 @@ export class EmployeeService {
           },
         });
 
-        return this.getEmployeeByIdOrThrow(tx, businessId, employeeId);
+        const employee = await this.getEmployeeByIdOrThrow(
+          tx,
+          businessId,
+          employeeId,
+        );
+
+        return apiResponse(employee, "Employee updated successfully");
       });
     } catch (error) {
       this.handlePrismaError(error);
@@ -279,8 +298,8 @@ export class EmployeeService {
 
   async updateStatus(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
     dto: UpdateEmployeeStatusDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -296,13 +315,19 @@ export class EmployeeService {
       },
     });
 
-    return this.getEmployeeByIdOrThrow(this.prisma, businessId, employeeId);
+    const employee = await this.getEmployeeByIdOrThrow(
+      this.prisma,
+      businessId,
+      employeeId,
+    );
+
+    return apiResponse(employee, "Employee status updated successfully");
   }
 
   async replaceRoles(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
     dto: AssignEmployeeRolesDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -359,13 +384,19 @@ export class EmployeeService {
       }
     });
 
-    return this.getEmployeeByIdOrThrow(this.prisma, businessId, employeeId);
+    const employee = await this.getEmployeeByIdOrThrow(
+      this.prisma,
+      businessId,
+      employeeId,
+    );
+
+    return apiResponse(employee, "Employee roles updated successfully");
   }
 
   async remove(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
   ) {
     if (currentUser.id === employeeId) {
       throw new BadRequestException("You cannot delete your own account here");
@@ -437,15 +468,12 @@ export class EmployeeService {
       });
     });
 
-    return {
-      message: "Employee deleted successfully",
-    };
+    return apiResponse(null, "Employee deleted successfully");
   }
 
-  private getEmployeeSelect(businessId: number): Prisma.SystemUserSelect {
+  private getEmployeeSelect(businessId: string): Prisma.SystemUserSelect {
     return {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       phone: true,
@@ -541,8 +569,8 @@ export class EmployeeService {
 
   private async getEmployeeByIdOrThrow(
     prisma: Prisma.TransactionClient | PrismaService,
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
   ) {
     const employee = await prisma.systemUser.findFirst({
       where: {
@@ -568,8 +596,8 @@ export class EmployeeService {
   }
 
   private async assertEmployeeBelongsToBusiness(
-    businessId: number,
-    employeeId: number,
+    businessId: string,
+    employeeId: string,
   ) {
     const employee = await this.prisma.systemUser.findFirst({
       where: {
@@ -595,8 +623,8 @@ export class EmployeeService {
   }
 
   private async assertRolesBelongToBusiness(
-    businessId: number,
-    roleIds: number[],
+    businessId: string,
+    roleIds: string[],
   ) {
     const roles = await this.prisma.rbacRole.findMany({
       where: {
@@ -619,7 +647,7 @@ export class EmployeeService {
     }
   }
 
-  private async assertEmailAvailable(email: string, ignoreUserId?: number) {
+  private async assertEmailAvailable(email: string, ignoreUserId?: string) {
     const existingUser = await this.prisma.systemUser.findFirst({
       where: {
         email,
@@ -640,7 +668,7 @@ export class EmployeeService {
     }
   }
 
-  private async assertPhoneAvailable(phone: string, ignoreUserId?: number) {
+  private async assertPhoneAvailable(phone: string, ignoreUserId?: string) {
     const existingUser = await this.prisma.systemUser.findFirst({
       where: {
         phone,
@@ -687,14 +715,8 @@ export class EmployeeService {
     return new Date(value);
   }
 
-  private normalizeRoleIds(roleIds: number[]) {
+  private normalizeRoleIds(roleIds: string[]) {
     const uniqueRoleIds = [...new Set(roleIds)];
-
-    for (const roleId of uniqueRoleIds) {
-      if (!Number.isInteger(roleId) || roleId <= 0) {
-        throw new BadRequestException("Invalid role ID");
-      }
-    }
 
     return uniqueRoleIds;
   }

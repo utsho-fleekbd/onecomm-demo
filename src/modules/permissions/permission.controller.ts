@@ -12,7 +12,7 @@ import {
   Get,
   Param,
   ParseEnumPipe,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -31,6 +31,7 @@ import { PermissionService } from "./permission.service";
 import { QueryPermissionDto } from "./dto/query-permission.dto";
 import { UpdatePermissionDto } from "./dto/update-permission.dto";
 import { PermissionItemDto } from "./dto/permission-item.dto";
+import { apiResponse } from "../../common/utils/api-response.util";
 
 @ApiTags("Permissions")
 @ApiBearerAuth()
@@ -51,17 +52,19 @@ export class PermissionController {
   @ApiOperation({
     summary: "Check for permission",
   })
-  hasPermission(
+  async hasPermission(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: PermissionItemDto,
   ) {
-    return this.permissionsService.hasPermission(
+    const hasPermission = await this.permissionsService.hasPermission(
       user,
       businessId,
       dto.feature,
       dto.action,
     );
+
+    return apiResponse({ hasPermission });
   }
 
   @Get("businesses/:businessId")
@@ -74,7 +77,7 @@ export class PermissionController {
   })
   findAll(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Query() query: QueryPermissionDto,
   ) {
     return this.permissionsService.findAll(currentUser, businessId, query);
@@ -90,8 +93,8 @@ export class PermissionController {
   })
   findByRole(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
   ) {
     return this.permissionsService.findByRole(currentUser, businessId, roleId);
   }
@@ -106,8 +109,8 @@ export class PermissionController {
   })
   addToRole(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
     @Body() dto: AddPermissionDto,
   ) {
     return this.permissionsService.addToRole(
@@ -130,8 +133,8 @@ export class PermissionController {
   })
   replaceRolePermissions(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
     @Body() dto: UpdatePermissionDto,
   ) {
     return this.permissionsService.replaceRolePermissions(
@@ -160,8 +163,8 @@ export class PermissionController {
   })
   removeFromRole(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
     @Param("feature", new ParseEnumPipe(RbacFeature)) feature: RbacFeature,
     @Param("action", new ParseEnumPipe(PermissionAction))
     action: PermissionAction,

@@ -1,13 +1,10 @@
-import { Type } from "class-transformer";
 import { ApiProperty } from "@nestjs/swagger";
-import { IsInt, IsString, Min } from "class-validator";
+import { IsString, IsUUID } from "class-validator";
 
 export class SelectBusinessDto {
-  @ApiProperty({ example: 1 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  declare businessId: number;
+  @ApiProperty({ example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913" })
+  @IsUUID()
+  declare businessId: string;
 
   @ApiProperty({ example: "refresh-token" })
   @IsString()

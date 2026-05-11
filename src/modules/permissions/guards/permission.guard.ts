@@ -1,5 +1,6 @@
 import { Request } from "express";
 import { Reflector } from "@nestjs/core";
+import { isUUID } from "class-validator";
 import {
   BadRequestException,
   CanActivate,
@@ -19,7 +20,7 @@ import { SystemUserType } from "@prisma/client";
 
 type AuthenticatedRequest = Request & {
   user?: CurrentUserPayload;
-  businessId?: number | null;
+  businessId?: string | null;
 };
 
 @Injectable()
@@ -71,13 +72,13 @@ export class PermissionGuard implements CanActivate {
   private getTargetBusinessId(
     request: AuthenticatedRequest,
     requiredPermission: RequiredPermissionMeta,
-  ) {
+  ): string | null {
     const rawParam = request.params?.[requiredPermission.businessIdParam];
 
     if (rawParam !== undefined) {
-      const businessId = Number(rawParam);
+      const businessId = String(rawParam);
 
-      if (!Number.isInteger(businessId) || businessId <= 0) {
+      if (!isUUID(businessId)) {
         throw new BadRequestException("Invalid business ID");
       }
 

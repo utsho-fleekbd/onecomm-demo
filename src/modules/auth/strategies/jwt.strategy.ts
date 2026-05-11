@@ -23,14 +23,14 @@ const ACCESSIBLE_BUSINESS_STATUSES = [
 ] satisfies BusinessStatus[];
 
 export type JwtPayload = {
-  sub: number;
-  businessId: number | null;
+  sub: string;
+  businessId: string | null;
   type: SystemUserType;
 };
 
 export type AuthenticatedRequest = Request & {
   user: CurrentUserPayload;
-  businessId?: number | null;
+  businessId?: string | null;
 };
 
 @Injectable()
