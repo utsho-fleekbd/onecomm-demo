@@ -1,4 +1,5 @@
 import { Reflector } from "@nestjs/core";
+import { isUUID } from "class-validator";
 import {
   BadRequestException,
   CanActivate,
@@ -49,7 +50,7 @@ export class BusinessGuard implements CanActivate {
   private getTargetBusinessId(
     context: ExecutionContext,
     request: AuthenticatedRequest,
-  ) {
+  ): string | null {
     const requiredPermission =
       this.reflector.getAllAndOverride<RequiredPermissionMeta>(
         REQUIRED_PERMISSION_KEY,
@@ -60,9 +61,9 @@ export class BusinessGuard implements CanActivate {
     const rawParam = request.params?.[businessIdParam];
 
     if (rawParam !== undefined) {
-      const businessId = Number(rawParam);
+      const businessId = String(rawParam);
 
-      if (!Number.isInteger(businessId) || businessId <= 0) {
+      if (!isUUID(businessId)) {
         throw new BadRequestException("Invalid business ID");
       }
 

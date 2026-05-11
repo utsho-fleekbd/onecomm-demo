@@ -20,6 +20,10 @@ import { PermissionItemDto } from "./dto/permission-item.dto";
 import { QueryPermissionDto } from "./dto/query-permission.dto";
 import { UpdatePermissionDto } from "./dto/update-permission.dto";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import {
+  apiResponse,
+  paginatedResponse,
+} from "../../common/utils/api-response.util";
 
 const ROLE_PERMISSION_INCLUDE = {
   role: {
@@ -51,24 +55,24 @@ export class PermissionService {
   ) {}
 
   getAvailablePermissions() {
-    return {
+    return apiResponse({
       actions: Object.values(PermissionAction),
       features: Object.values(RbacFeature).map((feature) => ({
         feature,
         actions: Object.values(PermissionAction),
       })),
-    };
+    });
   }
 
   async findAll(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     query: QueryPermissionDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const where: Prisma.RbacRolePermissionWhereInput = {
@@ -104,31 +108,30 @@ export class PermissionService {
       }),
     ]);
 
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      items,
-    };
+    return paginatedResponse(items, {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
   async findByRole(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
-    return this.getRoleWithPermissionsOrThrow(businessId, roleId);
+    const role = await this.getRoleWithPermissionsOrThrow(businessId, roleId);
+
+    return apiResponse(role);
   }
 
   async addToRole(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
     dto: AddPermissionDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -146,7 +149,7 @@ export class PermissionService {
         skipDuplicates: true,
       });
 
-      return tx.rbacRole.findFirst({
+      const role = await tx.rbacRole.findFirst({
         where: {
           id: roleId,
           businessId,
@@ -154,13 +157,15 @@ export class PermissionService {
         },
         include: ROLE_WITH_PERMISSIONS_INCLUDE,
       });
+
+      return apiResponse(role, "Permissions added successfully");
     });
   }
 
   async replaceRolePermissions(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
     dto: UpdatePermissionDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -185,7 +190,7 @@ export class PermissionService {
         });
       }
 
-      return tx.rbacRole.findFirst({
+      const role = await tx.rbacRole.findFirst({
         where: {
           id: roleId,
           businessId,
@@ -193,13 +198,15 @@ export class PermissionService {
         },
         include: ROLE_WITH_PERMISSIONS_INCLUDE,
       });
+
+      return apiResponse(role, "Permissions replaced successfully");
     });
   }
 
   async removeFromRole(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
     feature: RbacFeature,
     action: PermissionAction,
   ) {
@@ -218,12 +225,14 @@ export class PermissionService {
       throw new NotFoundException("Permission not found for this role");
     }
 
-    return this.getRoleWithPermissionsOrThrow(businessId, roleId);
+    const role = await this.getRoleWithPermissionsOrThrow(businessId, roleId);
+
+    return apiResponse(role, "Permission removed successfully");
   }
 
   async hasPermission(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     feature: RbacFeature,
     action: PermissionAction,
   ) {
@@ -275,7 +284,7 @@ export class PermissionService {
 
   async assertPermission(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     feature: RbacFeature,
     action: PermissionAction,
   ) {
@@ -294,8 +303,8 @@ export class PermissionService {
   }
 
   private async getRoleWithPermissionsOrThrow(
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
   ) {
     const role = await this.prisma.rbacRole.findFirst({
       where: {
@@ -314,8 +323,8 @@ export class PermissionService {
   }
 
   private async assertRoleBelongsToBusiness(
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
   ) {
     const role = await this.prisma.rbacRole.findFirst({
       where: {
@@ -333,7 +342,7 @@ export class PermissionService {
     }
   }
 
-  private async isBusinessOwner(userId: number, businessId: number) {
+  private async isBusinessOwner(userId: string, businessId: string) {
     const business = await this.prisma.business.findFirst({
       where: {
         id: businessId,

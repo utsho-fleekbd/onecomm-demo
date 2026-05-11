@@ -20,6 +20,10 @@ import {
 import { PrismaService } from "../../prisma/prisma.service";
 import { BusinessService } from "../business/business.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import {
+  apiResponse,
+  paginatedResponse,
+} from "../../common/utils/api-response.util";
 
 import { AssignRoleDto } from "./dto/assign-role.dto";
 import { CreateRoleDto } from "./dto/create-role.dto";
@@ -38,7 +42,6 @@ const RBAC_ROLE_INCLUDE = {
   createdBy: {
     select: {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       type: true,
@@ -48,7 +51,6 @@ const RBAC_ROLE_INCLUDE = {
   updatedBy: {
     select: {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       type: true,
@@ -69,7 +71,6 @@ const RBAC_ROLE_ASSIGNMENT_INCLUDE = {
   user: {
     select: {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       type: true,
@@ -91,7 +92,6 @@ const RBAC_ROLE_ASSIGNMENT_INCLUDE = {
   assignedByUser: {
     select: {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       type: true,
@@ -109,7 +109,7 @@ export class RoleService {
 
   async create(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     dto: CreateRoleDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -120,7 +120,7 @@ export class RoleService {
     const permissions = this.normalizePermissions(dto.permissions ?? []);
 
     try {
-      return await this.prisma.rbacRole.create({
+      const role = await this.prisma.rbacRole.create({
         data: {
           businessId,
           name,
@@ -141,6 +141,8 @@ export class RoleService {
         },
         include: RBAC_ROLE_INCLUDE,
       });
+
+      return apiResponse(role, "Role created successfully");
     } catch (error) {
       this.handlePrismaError(error);
     }
@@ -148,13 +150,13 @@ export class RoleService {
 
   async findAll(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     query: QueryRoleDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const sortBy = query.sortBy ?? "createdAt";
@@ -210,31 +212,30 @@ export class RoleService {
       }),
     ]);
 
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      items,
-    };
+    return paginatedResponse(items, {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
   async findOne(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
-    return this.getRoleOrThrow(businessId, roleId);
+    const role = await this.getRoleOrThrow(businessId, roleId);
+
+    return apiResponse(role);
   }
 
   async update(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
     dto: UpdateRoleDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -293,7 +294,7 @@ export class RoleService {
           }
         }
 
-        return tx.rbacRole.findFirst({
+        const role = await tx.rbacRole.findFirst({
           where: {
             id: roleId,
             businessId,
@@ -301,6 +302,8 @@ export class RoleService {
           },
           include: RBAC_ROLE_INCLUDE,
         });
+
+        return apiResponse(role, "Role updated successfully");
       });
     } catch (error) {
       this.handlePrismaError(error);
@@ -309,8 +312,8 @@ export class RoleService {
 
   async remove(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
@@ -338,15 +341,13 @@ export class RoleService {
       });
     });
 
-    return {
-      message: "Role deleted successfully",
-    };
+    return apiResponse(null, "Role deleted successfully");
   }
 
   async assignRole(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
     dto: AssignRoleDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
@@ -367,7 +368,7 @@ export class RoleService {
     });
 
     if (existingMap) {
-      return this.prisma.rbacUserRoleMap.update({
+      const assignment = await this.prisma.rbacUserRoleMap.update({
         where: {
           id: existingMap.id,
         },
@@ -379,9 +380,11 @@ export class RoleService {
         },
         include: RBAC_ROLE_ASSIGNMENT_INCLUDE,
       });
+
+      return apiResponse(assignment, "Role assigned successfully");
     }
 
-    return this.prisma.rbacUserRoleMap.create({
+    const assignment = await this.prisma.rbacUserRoleMap.create({
       data: {
         userId: dto.userId,
         roleId,
@@ -391,17 +394,19 @@ export class RoleService {
       },
       include: RBAC_ROLE_ASSIGNMENT_INCLUDE,
     });
+
+    return apiResponse(assignment, "Role assigned successfully");
   }
 
   async findAssignments(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     query: QueryRoleAssignmentsDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
 
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const where: Prisma.RbacUserRoleMapWhereInput = {
@@ -439,28 +444,25 @@ export class RoleService {
       }),
     ]);
 
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      items,
-    };
+    return paginatedResponse(items, {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
   async updateAssignment(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    assignmentId: number,
+    businessId: string,
+    assignmentId: string,
     dto: UpdateRoleAssignmentDto,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertAssignmentBelongsToBusiness(businessId, assignmentId);
     this.assertValidExpiryDate(dto.expiresAt ?? undefined);
 
-    return this.prisma.rbacUserRoleMap.update({
+    const assignment = await this.prisma.rbacUserRoleMap.update({
       where: {
         id: assignmentId,
       },
@@ -475,17 +477,19 @@ export class RoleService {
       },
       include: RBAC_ROLE_ASSIGNMENT_INCLUDE,
     });
+
+    return apiResponse(assignment, "Role assignment updated successfully");
   }
 
   async revokeAssignment(
     currentUser: CurrentUserPayload,
-    businessId: number,
-    assignmentId: number,
+    businessId: string,
+    assignmentId: string,
   ) {
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertAssignmentBelongsToBusiness(businessId, assignmentId);
 
-    return this.prisma.rbacUserRoleMap.update({
+    const assignment = await this.prisma.rbacUserRoleMap.update({
       where: {
         id: assignmentId,
       },
@@ -494,9 +498,11 @@ export class RoleService {
       },
       include: RBAC_ROLE_ASSIGNMENT_INCLUDE,
     });
+
+    return apiResponse(assignment, "Role assignment revoked successfully");
   }
 
-  private async getRoleOrThrow(businessId: number, roleId: number) {
+  private async getRoleOrThrow(businessId: string, roleId: string) {
     const role = await this.prisma.rbacRole.findFirst({
       where: {
         id: roleId,
@@ -514,8 +520,8 @@ export class RoleService {
   }
 
   private async assertRoleBelongsToBusiness(
-    businessId: number,
-    roleId: number,
+    businessId: string,
+    roleId: string,
   ) {
     const role = await this.prisma.rbacRole.findFirst({
       where: {
@@ -534,8 +540,8 @@ export class RoleService {
   }
 
   private async assertAssignmentBelongsToBusiness(
-    businessId: number,
-    assignmentId: number,
+    businessId: string,
+    assignmentId: string,
   ) {
     const assignment = await this.prisma.rbacUserRoleMap.findFirst({
       where: {
@@ -556,8 +562,8 @@ export class RoleService {
   }
 
   private async assertUserBelongsToBusiness(
-    userId: number,
-    businessId: number,
+    userId: string,
+    businessId: string,
   ) {
     const user = await this.prisma.systemUser.findFirst({
       where: {
@@ -608,9 +614,9 @@ export class RoleService {
   }
 
   private async ensureRoleNameAvailable(
-    businessId: number,
+    businessId: string,
     name: string,
-    ignoreRoleId?: number,
+    ignoreRoleId?: string,
   ) {
     const existingRole = await this.prisma.rbacRole.findFirst({
       where: {

@@ -1,15 +1,13 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsString } from "class-validator";
+import { IsOptional, IsString, IsUUID } from "class-validator";
 
 export class RefreshTokenDto {
   @ApiProperty({ example: "refresh-token" })
   @IsString()
   declare refreshToken: string;
 
-  @ApiProperty({ example: 1 })
+  @ApiProperty({ example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913" })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  declare businessId?: number;
+  @IsUUID()
+  declare businessId?: string;
 }

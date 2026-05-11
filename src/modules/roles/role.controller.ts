@@ -6,7 +6,7 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -45,7 +45,7 @@ export class RoleController {
   })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: CreateRoleDto,
   ) {
     return this.rolesService.create(currentUser, businessId, dto);
@@ -61,7 +61,7 @@ export class RoleController {
   })
   findAll(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Query() query: QueryRoleDto,
   ) {
     return this.rolesService.findAll(currentUser, businessId, query);
@@ -77,7 +77,7 @@ export class RoleController {
   })
   findAssignments(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Query() query: QueryRoleAssignmentsDto,
   ) {
     return this.rolesService.findAssignments(currentUser, businessId, query);
@@ -93,8 +93,8 @@ export class RoleController {
   })
   findOne(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
   ) {
     return this.rolesService.findOne(currentUser, businessId, roleId);
   }
@@ -109,8 +109,8 @@ export class RoleController {
   })
   update(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
     @Body() dto: UpdateRoleDto,
   ) {
     return this.rolesService.update(currentUser, businessId, roleId, dto);
@@ -126,8 +126,8 @@ export class RoleController {
   })
   remove(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
   ) {
     return this.rolesService.remove(currentUser, businessId, roleId);
   }
@@ -142,8 +142,8 @@ export class RoleController {
   })
   assignRole(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("roleId", ParseIntPipe) roleId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("roleId", ParseUUIDPipe) roleId: string,
     @Body() dto: AssignRoleDto,
   ) {
     return this.rolesService.assignRole(currentUser, businessId, roleId, dto);
@@ -159,8 +159,8 @@ export class RoleController {
   })
   updateAssignment(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("assignmentId", ParseIntPipe) assignmentId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("assignmentId", ParseUUIDPipe) assignmentId: string,
     @Body() dto: UpdateRoleAssignmentDto,
   ) {
     return this.rolesService.updateAssignment(
@@ -181,8 +181,8 @@ export class RoleController {
   })
   revokeAssignment(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("assignmentId", ParseIntPipe) assignmentId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("assignmentId", ParseUUIDPipe) assignmentId: string,
   ) {
     return this.rolesService.revokeAssignment(
       currentUser,

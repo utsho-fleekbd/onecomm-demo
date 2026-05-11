@@ -1,7 +1,7 @@
 import { Type } from "class-transformer";
 import { UserRoleMapStatus } from "@prisma/client";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsInt, IsOptional, Min } from "class-validator";
+import { IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from "class-validator";
 
 export class QueryRoleAssignmentsDto {
   @ApiPropertyOptional({ example: 1 })
@@ -9,28 +9,25 @@ export class QueryRoleAssignmentsDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number;
+  page?: number = 1;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional({ example: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number;
+  @Max(100)
+  limit?: number = 10;
 
-  @ApiPropertyOptional({ example: 12 })
+  @ApiPropertyOptional({ example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913" })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  userId?: number;
+  @IsUUID()
+  userId?: string;
 
-  @ApiPropertyOptional({ example: 3 })
+  @ApiPropertyOptional({ example: "817f7bc6-3c3b-4de8-b6df-05f9a9ab1e24" })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  roleId?: number;
+  @IsUUID()
+  roleId?: string;
 
   @ApiPropertyOptional({
     enum: UserRoleMapStatus,

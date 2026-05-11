@@ -20,8 +20,8 @@ enum BusinessMemberStatus {
 // =======================
 
 model Business {
-    id           Int            @id @default(autoincrement())
-    ownerUserId  Int            @map("owner_user_id")
+    id           String         @id @default(uuid()) @db.Uuid
+    ownerUserId  String         @map("owner_user_id") @db.Uuid
     name         String         @db.VarChar(150)
     slug         String         @db.VarChar(180)
     email        String?        @db.VarChar(255)
@@ -31,8 +31,8 @@ model Business {
     timezone     String         @default("Asia/Dhaka") @db.VarChar(100)
     status       BusinessStatus @default(TRIAL)
 
-    createdById Int? @map("created_by")
-    updatedById Int? @map("updated_by")
+    createdById String? @map("created_by") @db.Uuid
+    updatedById String? @map("updated_by") @db.Uuid
 
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -56,13 +56,10 @@ model Business {
 }
 
 model BusinessSetting {
-    id                   Int     @id @default(autoincrement())
-    businessId           Int     @unique @map("business_id")
+    id                   String  @id @default(uuid()) @db.Uuid
+    businessId           String  @unique @map("business_id") @db.Uuid
     orderPrefix          String  @default("ORD") @map("order_prefix") @db.VarChar(20)
     invoicePrefix        String  @default("INV") @map("invoice_prefix") @db.VarChar(20)
-    defaultLanguage      String  @default("en") @map("default_language") @db.VarChar(10)
-    defaultCurrency      String  @default("BDT") @map("default_currency") @db.VarChar(10)
-    timezone             String  @default("Asia/Dhaka") @db.VarChar(100)
     lowStockThreshold    Int     @default(5) @map("low_stock_threshold")
     allowBackorder       Boolean @default(false) @map("allow_backorder")
     autoConfirmOrder     Boolean @default(false) @map("auto_confirm_order")
@@ -78,8 +75,8 @@ model BusinessSetting {
 }
 
 model BusinessBranding {
-    id             Int     @id @default(autoincrement())
-    businessId     Int     @unique @map("business_id")
+    id             String  @id @default(uuid()) @db.Uuid
+    businessId     String  @unique @map("business_id") @db.Uuid
     logoUrl        String? @map("logo_url") @db.Text
     faviconUrl     String? @map("favicon_url") @db.Text
     primaryColor   String? @map("primary_color") @db.VarChar(20)
@@ -98,9 +95,9 @@ model BusinessBranding {
 }
 
 model BusinessMember {
-    id         Int                  @id @default(autoincrement())
-    businessId Int                  @map("business_id")
-    userId     Int                  @map("user_id")
+    id         String               @id @default(uuid()) @db.Uuid
+    businessId String               @map("business_id") @db.Uuid
+    userId     String               @map("user_id") @db.Uuid
     status     BusinessMemberStatus @default(ACTIVE)
     joinedAt   DateTime?            @map("joined_at") @db.Timestamptz(6)
 
