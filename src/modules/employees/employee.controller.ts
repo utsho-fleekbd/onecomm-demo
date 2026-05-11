@@ -4,7 +4,7 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -42,7 +42,7 @@ export class EmployeeController {
   })
   create(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: CreateEmployeeDto,
   ) {
     return this.employeeService.create(currentUser, businessId, dto);
@@ -55,7 +55,7 @@ export class EmployeeController {
   })
   findAll(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Query() query: QueryEmployeesDto,
   ) {
     return this.employeeService.findAll(currentUser, businessId, query);
@@ -68,8 +68,8 @@ export class EmployeeController {
   })
   findOne(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("employeeId", ParseIntPipe) employeeId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("employeeId", ParseUUIDPipe) employeeId: string,
   ) {
     return this.employeeService.findOne(currentUser, businessId, employeeId);
   }
@@ -81,8 +81,8 @@ export class EmployeeController {
   })
   update(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("employeeId", ParseIntPipe) employeeId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("employeeId", ParseUUIDPipe) employeeId: string,
     @Body() dto: UpdateEmployeeDto,
   ) {
     return this.employeeService.update(
@@ -100,8 +100,8 @@ export class EmployeeController {
   })
   updateStatus(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("employeeId", ParseIntPipe) employeeId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("employeeId", ParseUUIDPipe) employeeId: string,
     @Body() dto: UpdateEmployeeStatusDto,
   ) {
     return this.employeeService.updateStatus(
@@ -119,8 +119,8 @@ export class EmployeeController {
   })
   replaceRoles(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("employeeId", ParseIntPipe) employeeId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("employeeId", ParseUUIDPipe) employeeId: string,
     @Body() dto: AssignEmployeeRolesDto,
   ) {
     return this.employeeService.replaceRoles(
@@ -138,8 +138,8 @@ export class EmployeeController {
   })
   remove(
     @CurrentUser() currentUser: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
-    @Param("employeeId", ParseIntPipe) employeeId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("employeeId", ParseUUIDPipe) employeeId: string,
   ) {
     return this.employeeService.remove(currentUser, businessId, employeeId);
   }

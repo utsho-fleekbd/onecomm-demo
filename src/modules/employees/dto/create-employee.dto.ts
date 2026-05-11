@@ -6,12 +6,11 @@ import {
   IsArray,
   IsEmail,
   IsEnum,
-  IsInt,
   IsOptional,
   IsPhoneNumber,
   IsString,
+  IsUUID,
   MaxLength,
-  Min,
   MinLength,
   ValidateNested,
 } from "class-validator";
@@ -56,14 +55,15 @@ export class CreateEmployeeDto {
   profile?: EmployeeProfileDto;
 
   @ApiPropertyOptional({
-    example: [1, 2],
+    example: [
+      "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+      "817f7bc6-3c3b-4de8-b6df-05f9a9ab1e24",
+    ],
     description: "Optional RBAC role IDs to assign after employee creation.",
   })
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @Type(() => Number)
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  roleIds?: number[];
+  @IsUUID(undefined, { each: true })
+  roleIds?: string[];
 }

@@ -41,11 +41,11 @@ export class CreateRoleDto {
     type: [RolePermissionDto],
     example: [
       {
-        feature: "BUSINESS",
+        feature: "BUSINESS_MANAGEMENT",
         action: "READ",
       },
       {
-        feature: "BUSINESS",
+        feature: "BUSINESS_MANAGEMENT",
         action: "UPDATE",
       },
     ],

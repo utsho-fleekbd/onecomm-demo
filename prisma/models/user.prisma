@@ -30,8 +30,7 @@ enum OtpPurpose {
 // =======================
 
 model SystemUser {
-    id              Int              @id @default(autoincrement())
-    uuid            String           @unique @default(uuid()) @db.Uuid
+    id              String           @id @default(uuid()) @db.Uuid
     name            String           @db.VarChar(150)
     email           String           @unique @db.VarChar(255)
     phone           String?          @unique @db.VarChar(30)
@@ -41,9 +40,9 @@ model SystemUser {
     emailVerifiedAt DateTime?        @map("email_verified_at") @db.Timestamptz(6)
     // TODO: add tenant id (nullable)
 
-    createdById Int? @map("created_by")
-    updatedById Int? @map("updated_by")
-    deletedById Int? @map("deleted_by")
+    createdById String? @map("created_by") @db.Uuid
+    updatedById String? @map("updated_by") @db.Uuid
+    deletedById String? @map("deleted_by") @db.Uuid
 
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -81,8 +80,8 @@ model SystemUser {
 }
 
 model SystemUserProfile {
-    id          Int       @id @default(autoincrement())
-    userId      Int       @unique @map("user_id")
+    id          String    @id @default(uuid()) @db.Uuid
+    userId      String    @unique @map("user_id") @db.Uuid
     firstName   String?   @map("first_name") @db.VarChar(100)
     lastName    String?   @map("last_name") @db.VarChar(100)
     imageUrl    String?   @map("image_url") @db.Text
@@ -104,8 +103,8 @@ model SystemUserProfile {
 }
 
 model SystemEmailVerification {
-    id           Int        @id @default(autoincrement())
-    userId       Int        @map("user_id")
+    id           String     @id @default(uuid()) @db.Uuid
+    userId       String     @map("user_id") @db.Uuid
     otpHash      String     @map("otp_hash") @db.Text
     purpose      OtpPurpose
     attemptCount Int        @default(0) @map("attempt_count")
@@ -122,8 +121,8 @@ model SystemEmailVerification {
 }
 
 model SystemPasswordReset {
-    id           Int       @id @default(autoincrement())
-    userId       Int       @map("user_id")
+    id           String    @id @default(uuid()) @db.Uuid
+    userId       String    @map("user_id") @db.Uuid
     otpHash      String    @map("otp_hash") @db.Text
     attemptCount Int       @default(0) @map("attempt_count")
     expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
@@ -138,9 +137,9 @@ model SystemPasswordReset {
 }
 
 model SystemSession {
-    id               Int       @id @default(autoincrement())
-    userId           Int       @map("user_id")
-    businessId       Int?     @map("business_id")
+    id               String    @id @default(uuid()) @db.Uuid
+    userId           String    @map("user_id") @db.Uuid
+    businessId       String?   @map("business_id") @db.Uuid
     refreshTokenHash String    @unique @map("refresh_token_hash") @db.Text
     expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
     revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
@@ -157,9 +156,9 @@ model SystemSession {
 }
 
 model SystemAuditLog {
-    id         Int      @id @default(autoincrement())
-    userId     Int?     @map("user_id")
-    businessId Int?     @map("business_id")
+    id         String   @id @default(uuid()) @db.Uuid
+    userId     String?  @map("user_id") @db.Uuid
+    businessId String?  @map("business_id") @db.Uuid
     action     String   @db.VarChar(100)
     feature    String   @db.VarChar(100)
     entityName String   @map("entity_name") @db.VarChar(150)

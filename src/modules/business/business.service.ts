@@ -17,12 +17,15 @@ import { QueryBusinessDto } from "./dto/query-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CreateBusinessDto } from "./dto/create-business.dto";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import {
+  apiResponse,
+  paginatedResponse,
+} from "../../common/utils/api-response.util";
 
 const BUSINESS_INCLUDE = {
   ownerUser: {
     select: {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       type: true,
@@ -49,7 +52,7 @@ export class BusinessService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(
-    userId: number,
+    userId: string,
     userType: SystemUserType,
     dto: CreateBusinessDto,
     tx?: Prisma.TransactionClient,
@@ -72,10 +75,10 @@ export class BusinessService {
 
     const brandingData = dto.branding
       ? this.buildBusinessBrandingData(dto.branding)
-      : null;
+      : {};
 
     try {
-      return await client.business.create({
+      const business = await client.business.create({
         data: {
           name: dto.name.trim(),
           slug,
@@ -102,15 +105,14 @@ export class BusinessService {
             create: settingsData,
           },
 
-          ...(brandingData &&
-            this.hasKeys(brandingData) && {
-              branding: {
-                create: brandingData,
-              },
-            }),
+          branding: {
+            create: brandingData,
+          },
         },
         include: BUSINESS_INCLUDE,
       });
+
+      return apiResponse(business, "Business created successfully");
     } catch (error) {
       this.handlePrismaError(error);
     }
@@ -118,7 +120,7 @@ export class BusinessService {
 
   async findAll(currentUser: CurrentUserPayload, query: QueryBusinessDto) {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const sortBy = query.sortBy ?? "createdAt";
@@ -236,18 +238,15 @@ export class BusinessService {
       }),
     ]);
 
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      items,
-    };
+    return paginatedResponse(items, {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
-  async findOne(currentUser: CurrentUserPayload, businessId: number) {
+  async findOne(currentUser: CurrentUserPayload, businessId: string) {
     const business = await this.prisma.business.findFirst({
       where: {
         id: businessId,
@@ -261,12 +260,12 @@ export class BusinessService {
       throw new NotFoundException("Business not found");
     }
 
-    return business;
+    return apiResponse(business);
   }
 
   async update(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     dto: UpdateBusinessDto,
   ) {
     await this.assertCanManageBusiness(currentUser, businessId);
@@ -360,20 +359,29 @@ export class BusinessService {
     };
 
     try {
-      return await this.prisma.business.update({
+      const business = await this.prisma.business.update({
         where: {
           id: businessId,
         },
         data,
         include: BUSINESS_INCLUDE,
       });
+
+      return apiResponse(business, "Business updated successfully");
     } catch (error) {
       this.handlePrismaError(error);
     }
   }
 
-  async remove(currentUser: CurrentUserPayload, businessId: number) {
+  async remove(currentUser: CurrentUserPayload, businessId: string) {
     await this.assertCanManageBusiness(currentUser, businessId);
+
+    const businessCount = await this.prisma.business.count();
+    if (businessCount <= 1) {
+      throw new ForbiddenException(
+        "You must have at least one active business",
+      );
+    }
 
     await this.prisma.business.update({
       where: {
@@ -390,9 +398,7 @@ export class BusinessService {
       },
     });
 
-    return {
-      message: "Business deleted successfully",
-    };
+    return apiResponse(null, "Business deleted successfully");
   }
 
   private getBusinessAccessWhere(
@@ -422,7 +428,7 @@ export class BusinessService {
 
   async assertCanAccessBusiness(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
   ) {
     const where: Prisma.BusinessWhereInput = {
       id: businessId,
@@ -451,15 +457,15 @@ export class BusinessService {
 
   async assertCanManageBusiness(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
   ) {
     return this.assertCanAccessBusiness(currentUser, businessId);
   }
 
   private async ensureSlugAvailable(
     slug: string,
-    ownerUserId: number,
-    ignoreBusinessId?: number,
+    ownerUserId: string,
+    ignoreBusinessId?: string,
   ) {
     const existingBusiness = await this.prisma.business.findFirst({
       where: {
@@ -491,18 +497,6 @@ export class BusinessService {
 
       ...(dto.invoicePrefix !== undefined && {
         invoicePrefix: dto.invoicePrefix.trim().toUpperCase(),
-      }),
-
-      ...(dto.defaultLanguage !== undefined && {
-        defaultLanguage: dto.defaultLanguage.trim().toLowerCase(),
-      }),
-
-      ...(dto.defaultCurrency !== undefined && {
-        defaultCurrency: dto.defaultCurrency.trim().toUpperCase(),
-      }),
-
-      ...(dto.timezone !== undefined && {
-        timezone: dto.timezone.trim(),
       }),
 
       ...(dto.lowStockThreshold !== undefined && {

@@ -29,27 +29,6 @@ export class CreateBusinessSettingDto {
   @MaxLength(20)
   declare invoicePrefix?: string;
 
-  @ApiPropertyOptional({ example: "en" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  declare defaultLanguage?: string;
-
-  @ApiPropertyOptional({ example: "BDT" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  @Matches(/^[A-Z]{3,10}$/, {
-    message: "defaultCurrency must be uppercase, for example BDT",
-  })
-  declare defaultCurrency?: string;
-
-  @ApiPropertyOptional({ example: "Asia/Dhaka" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  declare timezone?: string;
-
   @ApiPropertyOptional({ example: 5 })
   @IsOptional()
   @Type(() => Number)

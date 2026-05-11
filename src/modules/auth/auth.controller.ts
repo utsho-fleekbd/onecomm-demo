@@ -17,7 +17,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
-  @ApiOperation({ summary: "Register admin and create first store" })
+  @ApiOperation({ summary: "Register admin and create first business" })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -34,10 +34,10 @@ export class AuthController {
     return this.authService.refresh(dto);
   }
 
-  @Post("select-store")
+  @Post("select-business")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Select active store after login" })
+  @ApiOperation({ summary: "Select active business after login" })
   selectBusiness(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: SelectBusinessDto,

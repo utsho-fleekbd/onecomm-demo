@@ -5,7 +5,7 @@ import { IsEnum } from "class-validator";
 export class RolePermissionDto {
   @ApiProperty({
     enum: RbacFeature,
-    example: RbacFeature.BUSINESS,
+    example: RbacFeature.BUSINESS_MANAGEMENT,
   })
   @IsEnum(RbacFeature)
   declare feature: RbacFeature;
