@@ -75,7 +75,7 @@ export class BusinessService {
 
     const brandingData = dto.branding
       ? this.buildBusinessBrandingData(dto.branding)
-      : null;
+      : {};
 
     try {
       const business = await client.business.create({
@@ -105,12 +105,9 @@ export class BusinessService {
             create: settingsData,
           },
 
-          ...(brandingData &&
-            this.hasKeys(brandingData) && {
-              branding: {
-                create: brandingData,
-              },
-            }),
+          branding: {
+            create: brandingData,
+          },
         },
         include: BUSINESS_INCLUDE,
       });
