@@ -30,6 +30,7 @@ import { AddPermissionDto } from "./dto/add-permission";
 import { PermissionService } from "./permission.service";
 import { QueryPermissionDto } from "./dto/query-permission.dto";
 import { UpdatePermissionDto } from "./dto/update-permission.dto";
+import { PermissionItemDto } from "./dto/permission-item.dto";
 
 @ApiTags("Permissions")
 @ApiBearerAuth()
@@ -44,6 +45,23 @@ export class PermissionController {
   })
   getAvailablePermissions() {
     return this.permissionsService.getAvailablePermissions();
+  }
+
+  @Post("has/businesses/:businessId")
+  @ApiOperation({
+    summary: "Check for permission",
+  })
+  hasPermission(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param("businessId", ParseIntPipe) businessId: number,
+    @Body() dto: PermissionItemDto,
+  ) {
+    return this.permissionsService.hasPermission(
+      user,
+      businessId,
+      dto.feature,
+      dto.action,
+    );
   }
 
   @Get("businesses/:businessId")
