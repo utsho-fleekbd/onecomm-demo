@@ -375,6 +375,13 @@ export class BusinessService {
   async remove(currentUser: CurrentUserPayload, businessId: number) {
     await this.assertCanManageBusiness(currentUser, businessId);
 
+    const businessCount = await this.prisma.business.count();
+    if (businessCount <= 1) {
+      throw new ForbiddenException(
+        "You must have at least one active business",
+      );
+    }
+
     await this.prisma.business.update({
       where: {
         id: businessId,

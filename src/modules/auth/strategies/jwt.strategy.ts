@@ -2,7 +2,11 @@ import { Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import {
   BusinessMemberStatus,
   BusinessStatus,
@@ -107,7 +111,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     });
 
     if (!business) {
-      throw new UnauthorizedException("You do not have access to this store");
+      throw new ForbiddenException("You do not have access to this business");
     }
 
     return {
