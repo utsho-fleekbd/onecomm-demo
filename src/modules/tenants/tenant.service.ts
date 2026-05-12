@@ -110,19 +110,17 @@ export class TenantService {
       [sortBy]: sortOrder,
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.systemUser.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        select: TENANT_SELECT,
-      }),
+    const items = await this.prisma.systemUser.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      select: TENANT_SELECT,
+    });
 
-      this.prisma.systemUser.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.systemUser.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,

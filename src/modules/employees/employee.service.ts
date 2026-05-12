@@ -178,19 +178,17 @@ export class EmployeeService {
       [sortBy]: sortOrder,
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.systemUser.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        select: this.getEmployeeSelect(businessId),
-      }),
+    const items = await this.prisma.systemUser.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      select: this.getEmployeeSelect(businessId),
+    });
 
-      this.prisma.systemUser.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.systemUser.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,

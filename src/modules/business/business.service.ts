@@ -237,19 +237,17 @@ export class BusinessService {
       [sortBy]: sortOrder,
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.business.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include: BUSINESS_INCLUDE,
-      }),
+    const items = await this.prisma.business.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: BUSINESS_INCLUDE,
+    });
 
-      this.prisma.business.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.business.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,

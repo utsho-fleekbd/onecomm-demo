@@ -99,19 +99,17 @@ export class PermissionService {
       }),
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.rbacRolePermission.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: [{ roleId: "asc" }, { feature: "asc" }, { action: "asc" }],
-        include: ROLE_PERMISSION_INCLUDE,
-      }),
+    const items = await this.prisma.rbacRolePermission.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: [{ roleId: "asc" }, { feature: "asc" }, { action: "asc" }],
+      include: ROLE_PERMISSION_INCLUDE,
+    });
 
-      this.prisma.rbacRolePermission.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.rbacRolePermission.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,
