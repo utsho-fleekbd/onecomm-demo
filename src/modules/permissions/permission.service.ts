@@ -47,6 +47,11 @@ const ROLE_WITH_PERMISSIONS_INCLUDE = {
   },
 } satisfies Prisma.RbacRoleInclude;
 
+type PermissionCheckOptions = {
+  isOwner?: boolean;
+  skipBusinessAccessCheck?: boolean;
+};
+
 @Injectable()
 export class PermissionService {
   constructor(
@@ -235,10 +240,23 @@ export class PermissionService {
     businessId: string,
     feature: RbacFeature,
     action: PermissionAction,
+    options: PermissionCheckOptions = {},
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+    if (currentUser.type === SystemUserType.ADMIN) {
+      return true;
+    }
 
-    const isOwner = await this.isBusinessOwner(currentUser.id, businessId);
+    let isOwner = options.isOwner ?? false;
+
+    if (!options.skipBusinessAccessCheck) {
+      const businessContext =
+        await this.businessService.assertCanAccessBusiness(
+          currentUser,
+          businessId,
+        );
+
+      isOwner = businessContext.isOwner;
+    }
 
     if (isOwner) {
       return true;
@@ -287,12 +305,14 @@ export class PermissionService {
     businessId: string,
     feature: RbacFeature,
     action: PermissionAction,
+    options: PermissionCheckOptions = {},
   ) {
     const hasPermission = await this.hasPermission(
       currentUser,
       businessId,
       feature,
       action,
+      options,
     );
 
     if (!hasPermission) {
@@ -340,21 +360,6 @@ export class PermissionService {
     if (!role) {
       throw new NotFoundException("Role not found");
     }
-  }
-
-  private async isBusinessOwner(userId: string, businessId: string) {
-    const business = await this.prisma.business.findFirst({
-      where: {
-        id: businessId,
-        deletedAt: null,
-        ownerUserId: userId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    return Boolean(business);
   }
 
   private normalizePermissions(permissions: PermissionItemDto[]) {

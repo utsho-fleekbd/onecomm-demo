@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { Injectable, Logger, NestMiddleware } from "@nestjs/common";
 
-import { CurrentUserPayload } from "../../modules/auth/decorators/current-user.decorator";
+import type { CurrentUserPayload } from "../../modules/auth/decorators/current-user.decorator";
 
 type RequestWithMeta = Request & {
   requestId?: string;

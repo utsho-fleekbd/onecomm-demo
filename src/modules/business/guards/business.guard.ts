@@ -10,12 +10,13 @@ import {
 } from "@nestjs/common";
 
 import { BusinessService } from "../business.service";
-import { AuthenticatedRequest } from "../../auth/strategies/jwt.strategy";
+import type { AuthenticatedRequest } from "../../auth/strategies/jwt.strategy";
 import {
   REQUIRED_PERMISSION_KEY,
   RequiredPermissionMeta,
 } from "../../permissions/decorators/require-permission.decorator";
 import { SystemUserType } from "@prisma/client";
+import { SKIP_BUSINESS_GUARD_KEY } from "../decorators/skip-business-guard.decorator";
 
 @Injectable()
 export class BusinessGuard implements CanActivate {
@@ -25,6 +26,15 @@ export class BusinessGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext) {
+    const skipBusinessGuard = this.reflector.getAllAndOverride<boolean>(
+      SKIP_BUSINESS_GUARD_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (skipBusinessGuard) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
@@ -36,11 +46,19 @@ export class BusinessGuard implements CanActivate {
 
     if (businessId === null) {
       request.businessId = null;
+      request.businessContext = null;
 
       return true;
     }
 
-    await this.businessService.assertCanAccessBusiness(user, businessId);
+    if (request.businessContext?.businessId === businessId) {
+      request.businessId = businessId;
+
+      return true;
+    }
+
+    request.businessContext =
+      await this.businessService.assertCanAccessBusiness(user, businessId);
 
     request.businessId = businessId;
 

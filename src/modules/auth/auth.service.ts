@@ -25,6 +25,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { SelectBusinessDto } from "./dto/select-business.dto";
 import { BusinessService } from "../business/business.service";
 import { apiResponse } from "../../common/utils/api-response.util";
+import type { CurrentUserPayload } from "./decorators/current-user.decorator";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -297,22 +298,7 @@ export class AuthService {
     });
   }
 
-  async me(userId: string, businessId: string | null) {
-    const user = await this.prisma.systemUser.findUnique({
-      where: {
-        id: userId,
-      },
-      omit: {
-        passwordHash: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException("Invalid authenticated user");
-    }
-
-    this.assertActiveUser(user);
-
+  async me(user: CurrentUserPayload) {
     if (user.type === SystemUserType.ADMIN) {
       return apiResponse({
         user,
@@ -320,7 +306,7 @@ export class AuthService {
       });
     }
 
-    const businesses = await this.findAccessibleBusinesses(userId);
+    const businesses = await this.findAccessibleBusinesses(user.id);
 
     if (businesses.length === 0) {
       throw new ForbiddenException("You are not assigned to any business");
@@ -328,9 +314,9 @@ export class AuthService {
 
     let selectedBusiness: AuthBusiness | null = null;
 
-    if (businessId !== null) {
+    if (user.businessId !== null) {
       selectedBusiness =
-        businesses.find((business) => business.id === businessId) ?? null;
+        businesses.find((business) => business.id === user.businessId) ?? null;
 
       if (!selectedBusiness) {
         throw new ForbiddenException(
