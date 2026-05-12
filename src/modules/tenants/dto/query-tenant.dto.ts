@@ -1,8 +1,7 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { BusinessStatus } from "@prisma/client";
+import { SystemUserStatus } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
-  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -12,26 +11,16 @@ import {
   Min,
 } from "class-validator";
 
-export class QueryBusinessDto {
-  @ApiPropertyOptional({ example: "business" })
+export class QueryTenantDto {
+  @ApiPropertyOptional({ example: "" })
   @IsOptional()
   @IsString()
   declare search?: string;
 
-  @ApiPropertyOptional({ enum: BusinessStatus })
+  @ApiPropertyOptional({ enum: SystemUserStatus })
   @IsOptional()
-  @IsEnum(BusinessStatus)
-  declare status?: BusinessStatus;
-
-  @ApiPropertyOptional({ example: "BDT" })
-  @IsOptional()
-  @IsString()
-  declare currencyCode?: string;
-
-  @ApiPropertyOptional({ example: "Bangladesh" })
-  @IsOptional()
-  @IsString()
-  declare country?: string;
+  @IsEnum(SystemUserStatus)
+  declare status?: SystemUserStatus;
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()
@@ -63,10 +52,4 @@ export class QueryBusinessDto {
   @IsOptional()
   @IsIn(["asc", "desc"])
   sortOrder?: "asc" | "desc" = "desc";
-
-  @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  includeDeleted?: boolean = false;
 }
