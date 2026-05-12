@@ -9,9 +9,7 @@ import {
   BusinessMemberStatus,
   BusinessStatus,
   CommonStatus,
-  PermissionAction,
   Prisma,
-  RbacFeature,
   SystemUserStatus,
   SystemUserType,
   UserRoleMapStatus,
@@ -198,19 +196,17 @@ export class RoleService {
       [sortBy]: sortOrder,
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.rbacRole.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include: RBAC_ROLE_INCLUDE,
-      }),
+    const items = await this.prisma.rbacRole.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: RBAC_ROLE_INCLUDE,
+    });
 
-      this.prisma.rbacRole.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.rbacRole.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,
@@ -428,21 +424,19 @@ export class RoleService {
       }),
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.rbacUserRoleMap.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: {
-          assignedAt: "desc",
-        },
-        include: RBAC_ROLE_ASSIGNMENT_INCLUDE,
-      }),
+    const items = await this.prisma.rbacUserRoleMap.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: {
+        assignedAt: "desc",
+      },
+      include: RBAC_ROLE_ASSIGNMENT_INCLUDE,
+    });
 
-      this.prisma.rbacUserRoleMap.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.rbacUserRoleMap.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,

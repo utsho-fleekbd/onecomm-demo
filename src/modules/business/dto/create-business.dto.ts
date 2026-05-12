@@ -102,7 +102,7 @@ export class CreateBusinessBrandingDto {
   @MaxLength(100)
   declare fontFamily?: string;
 
-  @ApiPropertyOptional({ example: "New Business" })
+  @ApiPropertyOptional({ example: "My Business" })
   @IsOptional()
   @IsString()
   @MaxLength(255)
@@ -115,21 +115,11 @@ export class CreateBusinessBrandingDto {
 }
 
 export class CreateBusinessDto {
-  @ApiProperty({ example: "New Business" })
+  @ApiProperty({ example: "My Business" })
   @IsString()
   @MinLength(2)
   @MaxLength(150)
   declare name: string;
-
-  @ApiPropertyOptional({ example: "new-business" })
-  @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(180)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message: "slug must contain lowercase letters, numbers, and hyphens only",
-  })
-  declare slug?: string;
 
   @ApiPropertyOptional({ example: "business@example.com" })
   @IsOptional()

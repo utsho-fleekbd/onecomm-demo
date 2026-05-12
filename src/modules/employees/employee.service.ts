@@ -61,7 +61,9 @@ export class EmployeeService {
     }
 
     const passwordHash = await this.hashPassword(dto.password);
-    const profileData = this.buildProfileData(dto.profile);
+    const profileData = this.buildProfileData(dto.profile, {
+      createEmpty: true,
+    });
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -77,11 +79,9 @@ export class EmployeeService {
             createdById: currentUser.id,
             updatedById: currentUser.id,
 
-            ...(profileData && {
-              profile: {
-                create: profileData,
-              },
-            }),
+            profile: {
+              create: profileData,
+            },
 
             businessMembers: {
               create: {
@@ -178,19 +178,17 @@ export class EmployeeService {
       [sortBy]: sortOrder,
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.systemUser.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        select: this.getEmployeeSelect(businessId),
-      }),
+    const items = await this.prisma.systemUser.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      select: this.getEmployeeSelect(businessId),
+    });
 
-      this.prisma.systemUser.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.systemUser.count({
+      where,
+    });
 
     return paginatedResponse(items, {
       page,
@@ -721,9 +719,12 @@ export class EmployeeService {
     return uniqueRoleIds;
   }
 
-  private buildProfileData(profile?: EmployeeProfileDto) {
+  private buildProfileData(
+    profile?: EmployeeProfileDto,
+    options: { createEmpty?: boolean } = {},
+  ) {
     if (!profile) {
-      return undefined;
+      return options.createEmpty ? {} : undefined;
     }
 
     return {
