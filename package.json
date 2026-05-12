@@ -16,6 +16,8 @@
     "db:migrate": "prisma migrate",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
+    "db:reset-data": "ts-node -r dotenv/config scripts/reset-db.ts",
+    "db:seed-admin": "ts-node -r dotenv/config scripts/seed-admin.ts",
     "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
