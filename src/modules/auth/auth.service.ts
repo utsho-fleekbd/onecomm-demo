@@ -75,6 +75,9 @@ export class AuthService {
           email,
           passwordHash,
           type: SystemUserType.TENANT,
+          profile: {
+            create: {},
+          },
         },
         select: {
           id: true,
@@ -83,6 +86,8 @@ export class AuthService {
           type: true,
           status: true,
           createdAt: true,
+          updatedAt: true,
+          profile: true,
         },
       });
 

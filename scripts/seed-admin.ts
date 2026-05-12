@@ -38,6 +38,9 @@ const main = async () => {
       type: SystemUserType.ADMIN,
       status: SystemUserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
+      profile: {
+        create: {},
+      },
     },
     update: {
       name,
@@ -47,6 +50,14 @@ const main = async () => {
       emailVerifiedAt: new Date(),
       deletedAt: null,
       deletedById: null,
+      profile: {
+        upsert: {
+          create: {},
+          update: {
+            deletedAt: null,
+          },
+        },
+      },
     },
     select: {
       id: true,

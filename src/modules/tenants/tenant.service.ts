@@ -22,7 +22,6 @@ const TENANT_SELECT = {
   _count: {
     select: {
       ownedBusinesses: true,
-      businessMembers: true,
     },
   },
 } satisfies Prisma.SystemUserSelect;
@@ -30,6 +29,22 @@ const TENANT_SELECT = {
 @Injectable()
 export class TenantService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async fineOne(id: string) {
+    const tenant = await this.prisma.systemUser.findFirst({
+      where: { id },
+      include: {
+        profile: true,
+        ownedBusinesses: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException();
+    }
+
+    return apiResponse(tenant);
+  }
 
   async findAll(query: QueryTenantDto) {
     const page = query.page ?? 1;

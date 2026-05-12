@@ -1,4 +1,9 @@
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from "@nestjs/swagger";
 import {
   Body,
   Controller,
@@ -24,6 +29,16 @@ import type { CurrentUserPayload } from "../auth/decorators/current-user.decorat
 @Controller("tenants")
 export class TenantController {
   constructor(private readonly tenantService: TenantService) {}
+
+  @Get(":tenantId")
+  @ApiOperation({ summary: "Get a tenant" })
+  @ApiParam({
+    name: "tenantId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
+  findOne(@Param("tenantId", ParseUUIDPipe) tenantId: string) {
+    return this.tenantService.fineOne(tenantId);
+  }
 
   @Get()
   @ApiOperation({ summary: "Get tenants" })
