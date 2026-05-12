@@ -50,7 +50,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
-    return this.authService.me(user.id, user.businessId);
+    return this.authService.me(user);
   }
 
   @Post("logout")

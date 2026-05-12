@@ -16,11 +16,16 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CreateBusinessDto } from "./dto/create-business.dto";
+import { RequestContextService } from "../../common/request-context/request-context.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import {
   apiResponse,
   paginatedResponse,
 } from "../../common/utils/api-response.util";
+import {
+  BusinessAccessContext,
+  getBusinessAccessCacheKey,
+} from "../../common/request-context/request-context.types";
 
 const BUSINESS_INCLUDE = {
   ownerUser: {
@@ -49,7 +54,10 @@ const ACCESSIBLE_BUSINESS_STATUSES = [
 
 @Injectable()
 export class BusinessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly requestContext: RequestContextService,
+  ) {}
 
   async create(
     userId: string,
@@ -429,7 +437,14 @@ export class BusinessService {
   async assertCanAccessBusiness(
     currentUser: CurrentUserPayload,
     businessId: string,
-  ) {
+  ): Promise<BusinessAccessContext> {
+    const cacheKey = getBusinessAccessCacheKey(currentUser.id, businessId);
+    const cachedAccess = this.requestContext.getBusinessAccess(cacheKey);
+
+    if (cachedAccess) {
+      return cachedAccess;
+    }
+
     const where: Prisma.BusinessWhereInput = {
       id: businessId,
       deletedAt: null,
@@ -445,6 +460,7 @@ export class BusinessService {
       where,
       select: {
         id: true,
+        ownerUserId: true,
       },
     });
 
@@ -453,6 +469,16 @@ export class BusinessService {
         "You do not have permission for this business",
       );
     }
+
+    const accessContext = {
+      businessId: business.id,
+      isAdmin: currentUser.type === SystemUserType.ADMIN,
+      isOwner: business.ownerUserId === currentUser.id,
+    };
+
+    this.requestContext.setBusinessAccess(cacheKey, accessContext);
+
+    return accessContext;
   }
 
   async assertCanManageBusiness(
