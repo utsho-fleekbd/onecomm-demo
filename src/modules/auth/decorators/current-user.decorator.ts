@@ -8,6 +8,8 @@ export type CurrentUserPayload = {
   type: SystemUserType;
   status: SystemUserStatus;
   businessId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export const CurrentUser = createParamDecorator(

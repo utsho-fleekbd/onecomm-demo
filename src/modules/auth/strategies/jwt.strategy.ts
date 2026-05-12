@@ -2,25 +2,12 @@ import { Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import {
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
-import {
-  BusinessMemberStatus,
-  BusinessStatus,
-  SystemUserStatus,
-  SystemUserType,
-} from "@prisma/client";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { SystemUserStatus, SystemUserType } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { CurrentUserPayload } from "../decorators/current-user.decorator";
-
-const ACCESSIBLE_BUSINESS_STATUSES = [
-  BusinessStatus.TRIAL,
-  BusinessStatus.ACTIVE,
-] satisfies BusinessStatus[];
+import type { BusinessAccessContext } from "../../../common/request-context/request-context.types";
+import type { CurrentUserPayload } from "../decorators/current-user.decorator";
 
 export type JwtPayload = {
   sub: string;
@@ -31,6 +18,7 @@ export type JwtPayload = {
 export type AuthenticatedRequest = Request & {
   user: CurrentUserPayload;
   businessId?: string | null;
+  businessContext?: BusinessAccessContext | null;
 };
 
 @Injectable()
@@ -57,6 +45,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
         email: true,
         type: true,
         status: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -81,37 +71,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
 
     if (!payload.businessId) {
       throw new UnauthorizedException("No business selected");
-    }
-
-    const business = await this.prisma.business.findFirst({
-      where: {
-        id: payload.businessId,
-        deletedAt: null,
-        status: {
-          in: ACCESSIBLE_BUSINESS_STATUSES,
-        },
-        OR: [
-          {
-            ownerUserId: user.id,
-          },
-          {
-            members: {
-              some: {
-                userId: user.id,
-                status: BusinessMemberStatus.ACTIVE,
-                deletedAt: null,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!business) {
-      throw new ForbiddenException("You do not have access to this business");
     }
 
     return {

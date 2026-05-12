@@ -1,4 +1,3 @@
-import { Request } from "express";
 import { Reflector } from "@nestjs/core";
 import { isUUID } from "class-validator";
 import {
@@ -11,17 +10,12 @@ import {
 } from "@nestjs/common";
 
 import { PermissionService } from "../permission.service";
-import type { CurrentUserPayload } from "../../auth/decorators/current-user.decorator";
+import type { AuthenticatedRequest } from "../../auth/strategies/jwt.strategy";
 import {
   REQUIRED_PERMISSION_KEY,
   RequiredPermissionMeta,
 } from "../decorators/require-permission.decorator";
 import { SystemUserType } from "@prisma/client";
-
-type AuthenticatedRequest = Request & {
-  user?: CurrentUserPayload;
-  businessId?: string | null;
-};
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -53,15 +47,25 @@ export class PermissionGuard implements CanActivate {
 
     if (businessId === null) {
       request.businessId = null;
+      request.businessContext = null;
 
       return true;
     }
+
+    const businessContext =
+      request.businessContext?.businessId === businessId
+        ? request.businessContext
+        : null;
 
     await this.permissionService.assertPermission(
       user,
       businessId,
       requiredPermission.feature,
       requiredPermission.action,
+      {
+        isOwner: businessContext?.isOwner,
+        skipBusinessAccessCheck: businessContext !== null,
+      },
     );
 
     request.businessId = businessId;

@@ -25,6 +25,9 @@ import { BusinessGuard } from "../business/guards/business.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RequirePermission } from "./decorators/require-permission.decorator";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import { CurrentBusiness } from "../business/decorators/current-business.decorator";
+import { SkipBusinessGuard } from "../business/decorators/skip-business-guard.decorator";
+import type { BusinessAccessContext } from "../../common/request-context/request-context.types";
 
 import { AddPermissionDto } from "./dto/add-permission";
 import { PermissionService } from "./permission.service";
@@ -41,6 +44,7 @@ export class PermissionController {
   constructor(private readonly permissionsService: PermissionService) {}
 
   @Get("available")
+  @SkipBusinessGuard()
   @ApiOperation({
     summary: "Get all available RBAC features and actions",
   })
@@ -54,14 +58,22 @@ export class PermissionController {
   })
   async hasPermission(
     @CurrentUser() user: CurrentUserPayload,
+    @CurrentBusiness() businessContext: BusinessAccessContext | null,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: PermissionItemDto,
   ) {
+    const canReuseBusinessContext =
+      businessContext?.businessId === businessId;
+
     const hasPermission = await this.permissionsService.hasPermission(
       user,
       businessId,
       dto.feature,
       dto.action,
+      {
+        isOwner: canReuseBusinessContext ? businessContext.isOwner : undefined,
+        skipBusinessAccessCheck: canReuseBusinessContext,
+      },
     );
 
     return apiResponse({ hasPermission });
