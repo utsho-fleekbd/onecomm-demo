@@ -5,7 +5,6 @@ import {
   SystemUserType,
 } from "@prisma/client";
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -26,6 +25,7 @@ import {
   BusinessAccessContext,
   getBusinessAccessCacheKey,
 } from "../../common/request-context/request-context.types";
+import { generateRandomSlug } from "../../common/utils/slug-generator.util";
 
 const BUSINESS_INCLUDE = {
   ownerUser: {
@@ -52,6 +52,9 @@ const ACCESSIBLE_BUSINESS_STATUSES = [
   BusinessStatus.ACTIVE,
 ] satisfies BusinessStatus[];
 
+const BUSINESS_SLUG_MAX_LENGTH = 180;
+const BUSINESS_SLUG_RETRY_LIMIT = 5;
+
 @Injectable()
 export class BusinessService {
   constructor(
@@ -73,9 +76,11 @@ export class BusinessService {
 
     const client = tx ?? this.prisma;
 
-    const slug = this.normalizeSlug(dto.slug || dto.name);
-
-    await this.ensureSlugAvailable(slug, userId);
+    const slug = await this.generateUniqueBusinessSlug(
+      dto.name,
+      userId,
+      client,
+    );
 
     const settingsData = dto.settings
       ? this.buildBusinessSettingData(dto.settings)
@@ -278,26 +283,6 @@ export class BusinessService {
   ) {
     await this.assertCanManageBusiness(currentUser, businessId);
 
-    const business = await this.prisma.business.findUnique({
-      where: {
-        id: businessId,
-      },
-      select: {
-        ownerUserId: true,
-      },
-    });
-
-    let slug: string | undefined;
-
-    if (dto.slug !== undefined) {
-      slug = this.normalizeSlug(dto.slug);
-      await this.ensureSlugAvailable(
-        slug,
-        business?.ownerUserId ?? currentUser.id,
-        businessId,
-      );
-    }
-
     const settingData = dto.settings
       ? this.buildBusinessSettingData(dto.settings)
       : null;
@@ -309,10 +294,6 @@ export class BusinessService {
     const data: Prisma.BusinessUpdateInput = {
       ...(dto.name !== undefined && {
         name: dto.name.trim(),
-      }),
-
-      ...(slug !== undefined && {
-        slug,
       }),
 
       ...(dto.email !== undefined && {
@@ -488,31 +469,6 @@ export class BusinessService {
     return this.assertCanAccessBusiness(currentUser, businessId);
   }
 
-  private async ensureSlugAvailable(
-    slug: string,
-    ownerUserId: string,
-    ignoreBusinessId?: string,
-  ) {
-    const existingBusiness = await this.prisma.business.findFirst({
-      where: {
-        slug,
-        ownerUserId,
-        ...(ignoreBusinessId !== undefined && {
-          id: {
-            not: ignoreBusinessId,
-          },
-        }),
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingBusiness) {
-      throw new ConflictException("Business slug already exists");
-    }
-  }
-
   private buildBusinessSettingData(
     dto: NonNullable<CreateBusinessDto["settings"]>,
   ) {
@@ -585,24 +541,33 @@ export class BusinessService {
     };
   }
 
-  private normalizeSlug(value: string) {
-    const slug = value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+  private async generateUniqueBusinessSlug(
+    name: string,
+    ownerUserId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    for (let attempt = 0; attempt < BUSINESS_SLUG_RETRY_LIMIT; attempt++) {
+      const slug = generateRandomSlug(name, {
+        fallback: "business",
+        maxLength: BUSINESS_SLUG_MAX_LENGTH,
+      });
 
-    if (!slug) {
-      throw new BadRequestException("Invalid business slug");
+      const existingBusiness = await client.business.findFirst({
+        where: {
+          slug,
+          ownerUserId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existingBusiness) {
+        return slug;
+      }
     }
 
-    if (slug.length > 180) {
-      throw new BadRequestException(
-        "Business slug must be less than 180 characters",
-      );
-    }
-
-    return slug;
+    throw new ConflictException("Could not generate a unique business slug");
   }
 
   private normalizeEmail(email: string) {
