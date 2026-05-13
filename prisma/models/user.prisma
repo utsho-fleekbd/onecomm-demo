@@ -38,7 +38,8 @@ model SystemUser {
     type            SystemUserType  
     status          SystemUserStatus @default(ACTIVE)
     emailVerifiedAt DateTime?        @map("email_verified_at") @db.Timestamptz(6)
-    // TODO: add tenant id (nullable)
+
+    tenantId String? @map("tenant_id") @db.Uuid
 
     createdById String? @map("created_by") @db.Uuid
     updatedById String? @map("updated_by") @db.Uuid
@@ -48,9 +49,13 @@ model SystemUser {
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
     deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
+    tenant SystemUser? @relation("TenantUsers", fields: [tenantId], references: [id], onDelete: SetNull)
+
     createdBy SystemUser? @relation("SystemUserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
     updatedBy SystemUser? @relation("SystemUserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
     deletedBy SystemUser? @relation("SystemUserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
+    tenantUsers SystemUser[] @relation("TenantUsers")
 
     usersCreated SystemUser[] @relation("SystemUserCreatedBy")
     usersUpdated SystemUser[] @relation("SystemUserUpdatedBy")
@@ -75,6 +80,7 @@ model SystemUser {
 
     @@index([type])
     @@index([status])
+    @@index([tenantId])
     @@index([deletedAt])
     @@map("system_users")
 }
