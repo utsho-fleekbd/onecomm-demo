@@ -8,6 +8,7 @@ import { CommonModule } from "./common/common.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RoleModule } from "./modules/roles/role.module";
+import { MediaModule } from "./modules/media/media.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
 import { BusinessModule } from "./modules/business/business.module";
 import { EmployeeModule } from "./modules/employees/employee.module";
@@ -24,6 +25,7 @@ import { RequestContextMiddleware } from "./common/request-context/request-conte
     CommonModule,
     PrismaModule,
     AuthModule,
+    MediaModule,
     TenantModule,
     BusinessModule,
     RoleModule,

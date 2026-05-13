@@ -36,7 +36,6 @@ model MediaAsset {
   fileType   MediaFileType    @map("file_type")
   mimeType   String?          @map("mime_type") @db.VarChar(100)
   fileSize   Int?             @map("file_size")
-  folder     String?          @db.VarChar(150)
   altText    String?          @map("alt_text")
   status     MediaAssetStatus @default(ACTIVE)
 
@@ -49,7 +48,6 @@ model MediaAsset {
   @@index([businessId])
   @@index([uploadedBy])
   @@index([fileType])
-  @@index([folder])
   @@index([status])
   @@map("media_assets")
 }
