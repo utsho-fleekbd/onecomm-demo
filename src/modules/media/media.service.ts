@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Inject,
   Injectable,
-  PayloadTooLargeException,
   UnsupportedMediaTypeException,
 } from "@nestjs/common";
 import {
@@ -21,13 +20,17 @@ import {
 } from "../../common/utils/api-response.util";
 import { QueryMediaDto } from "./dto/query-media.dto";
 import { UploadMediaDto } from "./dto/upload-media.dto";
-import { MEDIA_UPLOADER } from "./uploaders/media-uploader.constants";
+import { DeleteMediaBulkDto } from "./dto/delete-media.dto";
+import {
+  MEDIA_LIMITS,
+  MEDIA_UPLOADER,
+} from "./uploaders/media-uploader.constants";
+import type { MediaLimits } from "./media.config";
 import type {
   MediaUploader,
   UploadableMediaFile,
 } from "./uploaders/media-uploader.types";
 
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/gif",
   "image/jpeg",
@@ -55,6 +58,8 @@ export class MediaService {
     private readonly businessService: BusinessService,
     @Inject(MEDIA_UPLOADER)
     private readonly uploader: MediaUploader,
+    @Inject(MEDIA_LIMITS)
+    private readonly limits: MediaLimits,
   ) {}
 
   async uploadImage(
@@ -63,14 +68,6 @@ export class MediaService {
     file: UploadableMediaFile | undefined,
     dto: UploadMediaDto,
   ) {
-    console.log("Uploaded file from Swagger:", {
-      originalname: file?.originalname,
-      mimetype: file?.mimetype,
-      size: file?.size,
-      bufferLength: file?.buffer?.length,
-      hasBuffer: Buffer.isBuffer(file?.buffer),
-    });
-
     await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     this.assertValidImage(file);
 
@@ -79,40 +76,61 @@ export class MediaService {
       businessId,
     });
 
-    const asset = await this.prisma.mediaAsset.create({
-      data: {
-        businessId,
-        uploadedBy: currentUser.id,
-        fileName: uploadedFile.fileName,
-        fileUrl: uploadedFile.fileUrl,
-        fileType: MediaFileType.IMAGE,
-        mimeType: uploadedFile.mimeType,
-        fileSize: uploadedFile.fileSize,
-        altText: this.normalizeNullableText(dto.altText),
-        tags: {
-          create: tags.map((tag) => ({
-            tag: {
-              connectOrCreate: {
-                where: {
-                  businessId_name: {
-                    businessId,
-                    name: tag,
-                  },
-                },
-                create: {
-                  businessId,
-                  name: tag,
-                  status: MediaTagStatus.ACTIVE,
-                },
-              },
-            },
-          })),
-        },
-      },
-      include: MEDIA_ASSET_INCLUDE,
+    const asset = await this.createImageAsset({
+      businessId,
+      uploadedBy: currentUser.id,
+      uploadedFile,
+      altText: dto.altText,
+      tags,
     });
 
     return apiResponse(asset, "Image uploaded successfully");
+  }
+
+  async uploadImages(
+    currentUser: CurrentUserPayload,
+    businessId: string,
+    files: UploadableMediaFile[] | undefined,
+    dto: UploadMediaDto,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
+    if (!files || files.length === 0) {
+      throw new BadRequestException("At least one image file is required");
+    }
+
+    if (files.length > this.limits.maxBulkImageFiles) {
+      throw new BadRequestException(
+        `You can upload up to ${this.limits.maxBulkImageFiles} images at once`,
+      );
+    }
+
+    for (const file of files) {
+      this.assertValidImage(file);
+    }
+
+    const tags = this.normalizeTags(dto.tags);
+    const assets: Prisma.MediaAssetGetPayload<{
+      include: typeof MEDIA_ASSET_INCLUDE;
+    }>[] = [];
+
+    for (const file of files) {
+      const uploadedFile = await this.uploader.upload(file, {
+        businessId,
+      });
+
+      const asset = await this.createImageAsset({
+        businessId,
+        uploadedBy: currentUser.id,
+        uploadedFile,
+        altText: dto.altText,
+        tags,
+      });
+
+      assets.push(asset);
+    }
+
+    return apiResponse(assets, "Images uploaded successfully");
   }
 
   async findImages(
@@ -173,6 +191,56 @@ export class MediaService {
     });
   }
 
+  async deleteImage(
+    currentUser: CurrentUserPayload,
+    businessId: string,
+    mediaAssetId: string,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
+    const asset = await this.getActiveImageAssetOrThrow(
+      businessId,
+      mediaAssetId,
+    );
+
+    await this.softDeleteImageAssets([asset.id]);
+    await this.uploader.delete(asset.fileUrl);
+
+    return apiResponse(null, "Image deleted successfully");
+  }
+
+  async deleteImages(
+    currentUser: CurrentUserPayload,
+    businessId: string,
+    dto: DeleteMediaBulkDto,
+  ) {
+    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+
+    if (dto.mediaAssetIds.length > this.limits.maxBulkDeleteImages) {
+      throw new BadRequestException(
+        `You can delete up to ${this.limits.maxBulkDeleteImages} images at once`,
+      );
+    }
+
+    const assets = await this.getActiveImageAssetsOrThrow(
+      businessId,
+      dto.mediaAssetIds,
+    );
+
+    await this.softDeleteImageAssets(assets.map((asset) => asset.id));
+
+    await Promise.all(
+      assets.map((asset) => this.uploader.delete(asset.fileUrl)),
+    );
+
+    return apiResponse(
+      {
+        deletedCount: assets.length,
+      },
+      "Images deleted successfully",
+    );
+  }
+
   private assertValidImage(
     file: UploadableMediaFile | undefined,
   ): asserts file is UploadableMediaFile {
@@ -191,10 +259,121 @@ export class MediaService {
     if (!SUPPORTED_IMAGE_MIME_TYPES.has(file.mimetype)) {
       throw new UnsupportedMediaTypeException("Unsupported image type");
     }
+  }
 
-    if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      throw new PayloadTooLargeException("Image must be 5MB or smaller");
+  private async getActiveImageAssetOrThrow(
+    businessId: string,
+    mediaAssetId: string,
+  ) {
+    const asset = await this.prisma.mediaAsset.findFirst({
+      where: this.getActiveImageWhere(businessId, [mediaAssetId]),
+      select: {
+        id: true,
+        fileUrl: true,
+      },
+    });
+
+    if (!asset) {
+      throw new BadRequestException("Image not found");
     }
+
+    return asset;
+  }
+
+  private async getActiveImageAssetsOrThrow(
+    businessId: string,
+    mediaAssetIds: string[],
+  ) {
+    const uniqueMediaAssetIds = [...new Set(mediaAssetIds)];
+
+    const assets = await this.prisma.mediaAsset.findMany({
+      where: this.getActiveImageWhere(businessId, uniqueMediaAssetIds),
+      select: {
+        id: true,
+        fileUrl: true,
+      },
+    });
+
+    if (assets.length !== uniqueMediaAssetIds.length) {
+      throw new BadRequestException("One or more images were not found");
+    }
+
+    return assets;
+  }
+
+  private getActiveImageWhere(
+    businessId: string,
+    mediaAssetIds: string[],
+  ): Prisma.MediaAssetWhereInput {
+    return {
+      id: {
+        in: mediaAssetIds,
+      },
+      businessId,
+      fileType: MediaFileType.IMAGE,
+      status: MediaAssetStatus.ACTIVE,
+      deletedAt: null,
+    };
+  }
+
+  private async softDeleteImageAssets(mediaAssetIds: string[]) {
+    await this.prisma.mediaAsset.updateMany({
+      where: {
+        id: {
+          in: mediaAssetIds,
+        },
+      },
+      data: {
+        status: MediaAssetStatus.INACTIVE,
+        deletedAt: new Date(),
+      },
+    });
+  }
+
+  private async createImageAsset(params: {
+    businessId: string;
+    uploadedBy: string;
+    uploadedFile: {
+      fileName: string;
+      fileUrl: string;
+      mimeType: string;
+      fileSize: number;
+    };
+    altText?: string;
+    tags: string[];
+  }) {
+    return this.prisma.mediaAsset.create({
+      data: {
+        businessId: params.businessId,
+        uploadedBy: params.uploadedBy,
+        fileName: params.uploadedFile.fileName,
+        fileUrl: params.uploadedFile.fileUrl,
+        fileType: MediaFileType.IMAGE,
+        mimeType: params.uploadedFile.mimeType,
+        fileSize: params.uploadedFile.fileSize,
+        altText: this.normalizeNullableText(params.altText),
+        tags: {
+          create: params.tags.map((tag) => ({
+            tag: {
+              connectOrCreate: {
+                where: {
+                  businessId_name: {
+                    businessId: params.businessId,
+                    name: tag,
+                  },
+                },
+                create: {
+                  businessId: params.businessId,
+                  name: tag,
+                  status: MediaTagStatus.ACTIVE,
+                },
+              },
+            },
+          })),
+        },
+      },
+      include: MEDIA_ASSET_INCLUDE,
+    });
   }
 
   private normalizeTags(value?: string) {

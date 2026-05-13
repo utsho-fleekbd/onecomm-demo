@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { MulterModule } from "@nestjs/platform-express";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 
 import { MediaService } from "./media.service";
 import { MediaController } from "./media.controller";
@@ -6,8 +8,8 @@ import { BusinessModule } from "../business/business.module";
 import { PermissionModule } from "../permissions/permission.module";
 import { MEDIA_UPLOADER } from "./uploaders/media-uploader.constants";
 import { LocalMediaUploader } from "./uploaders/local-media.uploader";
-import { ConfigModule, ConfigService } from "@nestjs/config";
-import { MulterModule } from "@nestjs/platform-express";
+import { getMediaLimits } from "./media.config";
+import { MEDIA_LIMITS } from "./uploaders/media-uploader.constants";
 
 @Module({
   imports: [
@@ -18,13 +20,12 @@ import { MulterModule } from "@nestjs/platform-express";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const maxImageSizeBytes = configService.getOrThrow<number>(
-          "MAX_IMAGE_SIZE_BYTES",
-        );
+        const limits = getMediaLimits(configService);
 
         return {
           limits: {
-            fileSize: Number(maxImageSizeBytes),
+            fileSize: limits.maxImageSizeBytes,
+            files: limits.maxBulkImageFiles,
           },
         };
       },
@@ -34,6 +35,11 @@ import { MulterModule } from "@nestjs/platform-express";
   providers: [
     MediaService,
     LocalMediaUploader,
+    {
+      provide: MEDIA_LIMITS,
+      inject: [ConfigService],
+      useFactory: getMediaLimits,
+    },
     {
       provide: MEDIA_UPLOADER,
       useExisting: LocalMediaUploader,

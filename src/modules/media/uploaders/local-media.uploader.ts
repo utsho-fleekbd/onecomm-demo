@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { extname, join, normalize, relative } from "node:path";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -56,6 +56,29 @@ export class LocalMediaUploader implements MediaUploader {
       mimeType: file.mimetype,
       fileSize: file.size,
     };
+  }
+
+  async delete(fileUrl: string) {
+    const publicPrefix = this.publicUploadPrefix.endsWith("/")
+      ? this.publicUploadPrefix
+      : `${this.publicUploadPrefix}/`;
+
+    if (!fileUrl.startsWith(publicPrefix)) {
+      return;
+    }
+
+    const relativePath = fileUrl.slice(publicPrefix.length);
+    const uploadRootPath = join(process.cwd(), this.uploadRoot);
+    const absolutePath = normalize(join(uploadRootPath, relativePath));
+    const pathFromUploadRoot = relative(uploadRootPath, absolutePath);
+
+    if (pathFromUploadRoot.startsWith("..") || pathFromUploadRoot === "") {
+      return;
+    }
+
+    await rm(absolutePath, {
+      force: true,
+    });
   }
 
   private resolveExtension(file: UploadableMediaFile) {

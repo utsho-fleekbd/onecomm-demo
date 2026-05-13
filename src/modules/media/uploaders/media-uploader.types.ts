@@ -21,4 +21,6 @@ export interface MediaUploader {
     file: UploadableMediaFile,
     options: UploadMediaOptions,
   ): Promise<UploadedMediaFile>;
+
+  delete(fileUrl: string): Promise<void>;
 }
