@@ -12,7 +12,6 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
-import { BusinessService } from "../business/business.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import {
   apiResponse,
@@ -55,7 +54,6 @@ const MEDIA_ASSET_INCLUDE = {
 export class MediaService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly businessService: BusinessService,
     @Inject(MEDIA_UPLOADER)
     private readonly uploader: MediaUploader,
     @Inject(MEDIA_LIMITS)
@@ -68,7 +66,6 @@ export class MediaService {
     file: UploadableMediaFile | undefined,
     dto: UploadMediaDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     this.assertValidImage(file);
 
     const tags = this.normalizeTags(dto.tags);
@@ -93,8 +90,6 @@ export class MediaService {
     files: UploadableMediaFile[] | undefined,
     dto: UploadMediaDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
     if (!files || files.length === 0) {
       throw new BadRequestException("At least one image file is required");
     }
@@ -133,13 +128,7 @@ export class MediaService {
     return apiResponse(assets, "Images uploaded successfully");
   }
 
-  async findImages(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    query: QueryMediaDto,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async findImages(businessId: string, query: QueryMediaDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
@@ -191,13 +180,7 @@ export class MediaService {
     });
   }
 
-  async deleteImage(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    mediaAssetId: string,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async deleteImage(businessId: string, mediaAssetId: string) {
     const asset = await this.getActiveImageAssetOrThrow(
       businessId,
       mediaAssetId,
@@ -209,13 +192,7 @@ export class MediaService {
     return apiResponse(null, "Image deleted successfully");
   }
 
-  async deleteImages(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    dto: DeleteMediaBulkDto,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async deleteImages(businessId: string, dto: DeleteMediaBulkDto) {
     if (dto.mediaAssetIds.length > this.limits.maxBulkDeleteImages) {
       throw new BadRequestException(
         `You can delete up to ${this.limits.maxBulkDeleteImages} images at once`,

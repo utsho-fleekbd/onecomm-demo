@@ -8,16 +8,13 @@ import {
 import {
   BusinessMemberStatus,
   CommonStatus,
-  PermissionAction,
   Prisma,
-  RbacFeature,
   SystemUserStatus,
   SystemUserType,
   UserRoleMapStatus,
 } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
-import { BusinessService } from "../business/business.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import {
   apiResponse,
@@ -33,18 +30,13 @@ import { UpdateEmployeeStatusDto } from "./dto/update-employee-status.dto";
 
 @Injectable()
 export class EmployeeService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly businessService: BusinessService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(
     currentUser: CurrentUserPayload,
     businessId: string,
     dto: CreateEmployeeDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
     const email = this.normalizeEmail(dto.email);
     const phone = this.normalizeNullableText(dto.phone);
 
@@ -122,13 +114,7 @@ export class EmployeeService {
     }
   }
 
-  async findAll(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    query: QueryEmployeesDto,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async findAll(businessId: string, query: QueryEmployeesDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
@@ -203,13 +189,7 @@ export class EmployeeService {
     });
   }
 
-  async findOne(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    employeeId: string,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async findOne(businessId: string, employeeId: string) {
     const employee = await this.getEmployeeByIdOrThrow(
       this.prisma,
       businessId,
@@ -225,7 +205,6 @@ export class EmployeeService {
     employeeId: string,
     dto: UpdateEmployeeDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     const email =
@@ -305,7 +284,6 @@ export class EmployeeService {
     employeeId: string,
     dto: UpdateEmployeeStatusDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     await this.prisma.systemUser.update({
@@ -333,7 +311,6 @@ export class EmployeeService {
     employeeId: string,
     dto: AssignEmployeeRolesDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     const roleIds = this.normalizeRoleIds(dto.roleIds);
@@ -405,7 +382,6 @@ export class EmployeeService {
       throw new BadRequestException("You cannot delete your own account here");
     }
 
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertEmployeeBelongsToBusiness(businessId, employeeId);
 
     await this.prisma.$transaction(async (tx) => {

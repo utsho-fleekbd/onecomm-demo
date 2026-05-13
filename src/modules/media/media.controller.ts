@@ -116,36 +116,29 @@ export class MediaController {
   @RequirePermission(RbacFeature.MEDIA_MANAGEMENT, PermissionAction.READ)
   @ApiOperation({ summary: "Get business images" })
   findImages(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Query() query: QueryMediaDto,
   ) {
-    return this.mediaService.findImages(currentUser, businessId, query);
+    return this.mediaService.findImages(businessId, query);
   }
 
   @Delete("images/bulk")
   @RequirePermission(RbacFeature.MEDIA_MANAGEMENT, PermissionAction.DELETE)
   @ApiOperation({ summary: "Bulk delete images" })
   deleteImages(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: DeleteMediaBulkDto,
   ) {
-    return this.mediaService.deleteImages(currentUser, businessId, dto);
+    return this.mediaService.deleteImages(businessId, dto);
   }
 
   @Delete("images/:mediaAssetId")
   @RequirePermission(RbacFeature.MEDIA_MANAGEMENT, PermissionAction.DELETE)
   @ApiOperation({ summary: "Delete image" })
   deleteImage(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Param("mediaAssetId", ParseUUIDPipe) mediaAssetId: string,
   ) {
-    return this.mediaService.deleteImage(
-      currentUser,
-      businessId,
-      mediaAssetId,
-    );
+    return this.mediaService.deleteImage(businessId, mediaAssetId);
   }
 }
