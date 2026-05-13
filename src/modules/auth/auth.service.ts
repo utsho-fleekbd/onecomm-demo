@@ -1,18 +1,21 @@
 import * as argon2 from "argon2";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import {
   BusinessMemberStatus,
   BusinessStatus,
+  OtpPurpose,
   SystemUser,
   SystemUserStatus,
   SystemUserType,
 } from "@prisma/client";
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 
@@ -26,6 +29,10 @@ import { SelectBusinessDto } from "./dto/select-business.dto";
 import { BusinessService } from "../business/business.service";
 import { apiResponse } from "../../common/utils/api-response.util";
 import type { CurrentUserPayload } from "./decorators/current-user.decorator";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { MailService } from "../mail/mail.service";
+import { VerifyRegisterDto } from "./dto/verify-register.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -50,7 +57,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly businessService: BusinessService,
-  ) {}
+    private readonly mailService: MailService,
+  ) { }
 
   async register(dto: RegisterDto) {
     const email = this.normalizeEmail(dto.email);
@@ -59,48 +67,276 @@ export class AuthService {
       where: { email },
       select: {
         id: true,
+        status: true,
+        ownedBusinesses: {
+          select: {
+            id: true,
+          },
+        },
       },
     });
 
-    if (existingUser) {
+    if (existingUser && existingUser.status !== SystemUserStatus.INACTIVE) {
       throw new ConflictException("Email already exists");
     }
 
-    const passwordHash = await this.hashPassword(dto.password);
-
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.systemUser.create({
-        data: {
-          name: dto.name,
-          email,
-          passwordHash,
-          type: SystemUserType.TENANT,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          type: true,
-          status: true,
-          createdAt: true,
-        },
-      });
-
-      const selectedBusinessResponse = await this.businessService.create(
-        user.id,
-        user.type,
-        {
-          name: dto.businessName,
-        },
-        tx,
+    if (existingUser?.status === SystemUserStatus.INACTIVE) {
+      const oldUserId = existingUser.id;
+      const ownedBusinessIds = existingUser.ownedBusinesses.map(
+        (business) => business.id,
       );
-      const selectedBusiness = selectedBusinessResponse.data;
 
-      return apiResponse({
-        user,
-        selectedBusiness,
-      });
+      await this.prisma.$transaction(
+        async (tx) => {
+          if (ownedBusinessIds.length > 0) {
+            await tx.businessSetting.deleteMany({
+              where: {
+                businessId: {
+                  in: ownedBusinessIds,
+                },
+              },
+            });
+
+            await tx.businessBranding.deleteMany({
+              where: {
+                businessId: {
+                  in: ownedBusinessIds,
+                },
+              },
+            });
+
+            await tx.systemSession.deleteMany({
+              where: {
+                businessId: {
+                  in: ownedBusinessIds,
+                },
+              },
+            });
+
+            await tx.business.deleteMany({
+              where: {
+                id: {
+                  in: ownedBusinessIds,
+                },
+              },
+            });
+          }
+
+          await tx.systemEmailVerification.deleteMany({
+            where: {
+              userId: oldUserId,
+            },
+          });
+
+          await tx.systemSession.deleteMany({
+            where: {
+              userId: oldUserId,
+            },
+          });
+
+          await tx.systemUser.delete({
+            where: {
+              id: oldUserId,
+            },
+          });
+        },
+        {
+          maxWait: 10000,
+          timeout: 15000,
+        },
+      );
+    }
+
+    const otp = this.generateOtp();
+    const otpHash = await this.hashPassword(otp);
+    const passwordHash = await this.hashPassword(dto.password);
+    const expiresAt = this.getOtpExpiresAt();
+
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const user = await tx.systemUser.create({
+          data: {
+            name: dto.name,
+            email,
+            passwordHash,
+            status: SystemUserStatus.INACTIVE,
+            type: SystemUserType.TENANT,
+            emailVerifiedAt: null,
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            type: true,
+            status: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+          },
+        });
+
+        await tx.systemEmailVerification.create({
+          data: {
+            userId: user.id,
+            otpHash,
+            purpose: OtpPurpose.EMAIL_VERIFICATION,
+            expiresAt,
+          },
+        });
+
+        let selectedBusiness: unknown = null;
+
+        if (dto.businessName?.trim()) {
+          const selectedBusinessResponse = await this.businessService.create(
+            user.id,
+            user.type,
+            {
+              name: dto.businessName,
+            },
+            tx,
+          );
+
+          selectedBusiness = selectedBusinessResponse.data;
+        }
+
+        return {
+          user,
+          selectedBusiness,
+        };
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000,
+      },
+    );
+
+    await this.mailService.sendRegisterOtpEmail(email, otp);
+
+    return apiResponse(
+      result,
+      "Registration successful. Please verify your email.",
+    );
+  }
+
+  async verifyRegister(dto: VerifyRegisterDto) {
+    const email = this.normalizeEmail(dto.email);
+
+    const user = await this.prisma.systemUser.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        emailVerifiedAt: true,
+      },
     });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    if (user.emailVerifiedAt) {
+      return apiResponse(null, "Email already verified");
+    }
+
+    const verification = await this.prisma.systemEmailVerification.findFirst({
+      where: {
+        userId: user.id,
+        purpose: OtpPurpose.EMAIL_VERIFICATION,
+        verifiedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!verification) {
+      throw new BadRequestException("OTP is invalid or expired");
+    }
+
+    if (verification.attemptCount >= 5) {
+      throw new BadRequestException(
+        "Too many attempts. Please request a new OTP",
+      );
+    }
+
+    const isOtpMatched = await this.verifyPassword(
+      verification.otpHash,
+      dto.otp,
+    );
+
+    if (!isOtpMatched) {
+      await this.prisma.systemEmailVerification.update({
+        where: {
+          id: verification.id,
+        },
+        data: {
+          attemptCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      throw new BadRequestException("Invalid OTP");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.systemEmailVerification.update({
+        where: {
+          id: verification.id,
+        },
+        data: {
+          verifiedAt: new Date(),
+        },
+      }),
+
+      this.prisma.systemUser.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          emailVerifiedAt: new Date(),
+          status: SystemUserStatus.ACTIVE,
+        },
+      }),
+    ]);
+
+    return apiResponse({ success: "true" }, "Email verified successfully");
+  }
+
+  async checkEmail(email: string) {
+    const normalizedEmail = this.normalizeEmail(email);
+    const user = await this.prisma.systemUser.findUnique({
+      where: {
+        email: normalizedEmail,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (user?.status === "INACTIVE") {
+      return {
+        success: true,
+        message: "Email is available",
+        data: {
+          exists: false,
+          available: true,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      message: user ? "Email already exists" : "Email is available",
+      data: {
+        exists: Boolean(user),
+        available: !user,
+      },
+    };
   }
 
   async login(dto: LoginDto) {
@@ -161,6 +397,84 @@ export class AuthService {
       businesses,
       user: safeUser,
     });
+  }
+
+  async resetPassword(user: CurrentUserPayload, dto: ResetPasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException(
+        "New password and confirm password do not match",
+      );
+    }
+
+    if (dto.oldPassword === dto.newPassword) {
+      throw new BadRequestException(
+        "New password must be different from old password",
+      );
+    }
+
+    const existingUser = await this.prisma.systemUser.findUnique({
+      where: {
+        id: user.id,
+      },
+      select: {
+        id: true,
+        passwordHash: true,
+        status: true,
+      },
+    });
+
+    if (!existingUser) {
+      throw new UnauthorizedException("Invalid authenticated user");
+    }
+
+    this.assertActiveUser(existingUser);
+
+    const isOldPasswordMatched = await this.verifyPassword(
+      existingUser.passwordHash,
+      dto.oldPassword,
+    );
+
+    if (!isOldPasswordMatched) {
+      throw new UnauthorizedException("Old password is incorrect");
+    }
+
+    const newPasswordHash = await this.hashPassword(dto.newPassword);
+
+    const resetToken = "123456";
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+    await this.prisma.$transaction(async (tx) => {
+      const passwordReset = await tx.systemPasswordReset.create({
+        data: {
+          userId: existingUser.id,
+          otpHash: resetToken,
+          expiresAt,
+          usedAt: new Date(),
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      await tx.systemUser.update({
+        where: {
+          id: existingUser.id,
+        },
+        data: {
+          passwordHash: newPasswordHash,
+        },
+      });
+
+      console.log("passwordReset", passwordReset);
+
+      return passwordReset;
+    });
+
+    console.log("password", isOldPasswordMatched);
+
+    return "reset";
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -308,6 +622,10 @@ export class AuthService {
 
     const businesses = await this.findAccessibleBusinesses(user.id);
 
+    const profile = await this.prisma.systemUserProfile.findFirst({
+      where: { userId: user.id },
+    });
+
     if (businesses.length === 0) {
       throw new ForbiddenException("You are not assigned to any business");
     }
@@ -327,9 +645,84 @@ export class AuthService {
 
     return apiResponse({
       user,
+      profile,
       selectedBusiness,
       businesses,
     });
+  }
+
+  async updateUser(userId: string, dto: UpdateUserDto) {
+    const user = await this.prisma.systemUser.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    if (dto.phone) {
+      const phoneExists = await this.prisma.systemUser.findFirst({
+        where: {
+          phone: dto.phone,
+          id: {
+            not: userId,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (phoneExists) {
+        throw new ConflictException("Phone already exists");
+      }
+    }
+
+    const updatedUser = await this.prisma.systemUser.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        name: dto.name,
+        phone: dto.phone,
+
+        profile: dto.profile
+          ? {
+            upsert: {
+              create: {
+                ...dto.profile,
+                dateOfBirth: dto.profile.dateOfBirth
+                  ? new Date(dto.profile.dateOfBirth)
+                  : undefined,
+              },
+              update: {
+                ...dto.profile,
+                dateOfBirth: dto.profile.dateOfBirth
+                  ? new Date(dto.profile.dateOfBirth)
+                  : undefined,
+              },
+            },
+          }
+          : undefined,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        type: true,
+        status: true,
+        profile: true,
+      },
+    });
+
+    return apiResponse(updatedUser, "User updated successfully");
   }
 
   async logout(dto: LogoutDto, userId?: string) {
@@ -353,6 +746,17 @@ export class AuthService {
     await this.revokeAllUserSessions(userId);
 
     return apiResponse(null, "Logged out from all devices successfully");
+  }
+
+  private generateOtp() {
+    return String(randomInt(100000, 1000000));
+  }
+
+  private getOtpExpiresAt() {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+    return expiresAt;
   }
 
   private async issueTokenPair(payload: JwtPayload) {

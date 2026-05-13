@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { LoginDto } from "./dto/login.dto";
@@ -10,11 +10,14 @@ import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { SelectBusinessDto } from "./dto/select-business.dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import type { CurrentUserPayload } from "./decorators/current-user.decorator";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { VerifyRegisterDto } from "./dto/verify-register.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post("register")
   @ApiOperation({ summary: "Register admin and create first business" })
@@ -22,10 +25,32 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  @Post("register/verify")
+  verifyRegister(@Body() dto: VerifyRegisterDto) {
+    return this.authService.verifyRegister(dto);
+  }
+
+  @Get("check-email")
+  @ApiOperation({ summary: "Email Validation" })
+  checkEmail(@Query("email") email: string) {
+    return this.authService.checkEmail(email);
+  }
+
   @Post("login")
   @ApiOperation({ summary: "Login user" })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post("reset")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Password reset" })
+  resetPassword(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: ResetPasswordDto,
+  ) {
+    return this.authService.resetPassword(user, dto);
   }
 
   @Post("refresh")
@@ -51,6 +76,17 @@ export class AuthController {
   @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
     return this.authService.me(user);
+  }
+
+  @Patch("profile/update")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Get authenticated user profile" })
+  updateUser(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.authService.updateUser(user.id, dto);
   }
 
   @Post("logout")
