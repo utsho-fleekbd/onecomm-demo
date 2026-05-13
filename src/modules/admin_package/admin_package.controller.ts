@@ -219,27 +219,27 @@ export class AdminPackageController {
     return this.adminPackageService.getSubscriptionUsage(subscriptionId);
   }
 
-  @Post("subscriptions/:subscriptionId/usage")
-  upsertUsageCounter(
-    @Param("subscriptionId", ParseUUIDPipe) subscriptionId: string,
-    @Body() dto: UpsertPackageUsageCounterDto,
-  ) {
-    return this.adminPackageService.upsertUsageCounter(subscriptionId, dto);
-  }
+  // @Post("subscriptions/:subscriptionId/usage")
+  // upsertUsageCounter(
+  //   @Param("subscriptionId", ParseUUIDPipe) subscriptionId: string,
+  //   @Body() dto: UpsertPackageUsageCounterDto,
+  // ) {
+  //   return this.adminPackageService.upsertUsageCounter(subscriptionId, dto);
+  // }
 
-  @Post("subscriptions/:subscriptionId/usage/:limitKey/increment")
-  incrementUsage(
-    @Param("subscriptionId", ParseUUIDPipe) subscriptionId: string,
-    @Param("limitKey", new ParseEnumPipe(PackageLimitKey))
-    limitKey: PackageLimitKey,
-    @Body() dto: IncrementPackageUsageDto,
-  ) {
-    return this.adminPackageService.incrementUsage(
-      subscriptionId,
-      limitKey,
-      dto,
-    );
-  }
+  // @Post("subscriptions/:subscriptionId/usage/:limitKey/increment")
+  // incrementUsage(
+  //   @Param("subscriptionId", ParseUUIDPipe) subscriptionId: string,
+  //   @Param("limitKey", new ParseEnumPipe(PackageLimitKey))
+  //   limitKey: PackageLimitKey,
+  //   @Body() dto: IncrementPackageUsageDto,
+  // ) {
+  //   return this.adminPackageService.incrementUsage(
+  //     subscriptionId,
+  //     limitKey,
+  //     dto,
+  //   );
+  // }
 
   @Get("subscriptions/:subscriptionId/limit-summary")
   getLimitSummary(
