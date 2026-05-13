@@ -8,6 +8,7 @@ export type CurrentUserPayload = {
   type: SystemUserType;
   status: SystemUserStatus;
   businessId: string | null;
+  tenantId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

@@ -76,6 +76,11 @@ export class EmployeeService {
             type: SystemUserType.EMPLOYEE,
             status: dto.status ?? SystemUserStatus.ACTIVE,
 
+            tenantId:
+              currentUser.type === SystemUserType.TENANT
+                ? currentUser.id
+                : currentUser.tenantId,
+
             createdById: currentUser.id,
             updatedById: currentUser.id,
 

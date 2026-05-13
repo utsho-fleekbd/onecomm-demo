@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { PrismaService } from "../../prisma/prisma.service";
-import { Prisma, SystemUserType } from "@prisma/client";
+import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
 import { QueryTenantDto } from "./dto/query-tenant.dto";
 import { UpdateTenantStatusDto } from "./dto/update-tenant-status.dto";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
@@ -22,6 +22,7 @@ const TENANT_SELECT = {
   _count: {
     select: {
       ownedBusinesses: true,
+      tenantUsers: true,
     },
   },
 } satisfies Prisma.SystemUserSelect;
@@ -150,17 +151,23 @@ export class TenantService {
       throw new NotFoundException("Tenant not found");
     }
 
-    const updatedTenant = await this.prisma.systemUser.update({
-      where: {
-        id: tenantId,
-      },
-      data: {
-        status: dto.status,
-        updatedById: currentUser.id,
-      },
-      select: TENANT_SELECT,
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const updatedTenant = await tx.systemUser.update({
+        where: { id: tenantId },
+        data: {
+          status: dto.status,
+          updatedById: currentUser.id,
+        },
+      });
 
-    return apiResponse(updatedTenant, "Tenant status updated successfully");
+      await tx.systemUser.updateMany({
+        where: { tenantId: updatedTenant.id },
+        data: {
+          status: dto.status,
+        },
+      });
+
+      return apiResponse(updatedTenant, "Tenant status updated successfully");
+    });
   }
 }
