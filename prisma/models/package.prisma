@@ -22,6 +22,21 @@ enum PackageResetCycle {
   YEARLY
 }
 
+enum PackageLimitKey {
+  MAX_PRODUCTS        @map("max_products")
+  MAX_STAFF           @map("max_staff")
+  MAX_BUSINESSES      @map("max_businesses")
+  MAX_WAREHOUSES      @map("max_warehouses")
+  MAX_SHOWROOMS       @map("max_showrooms")
+  MAX_CATEGORIES      @map("max_categories")
+  MAX_BRANDS          @map("max_brands")
+  MAX_ORDERS_MONTHLY  @map("max_orders_monthly")
+  SMS_CREDITS         @map("sms_credits")
+  STORAGE_MB          @map("storage_mb")
+  CUSTOM_DOMAINS      @map("custom_domains")
+  WEBSITE_PAGES       @map("website_pages")
+}
+
 enum PackageSubscriptionStatus {
   TRIALING
   ACTIVE
@@ -62,11 +77,10 @@ model PackagePlan {
   @@map("package_plans")
 }
 
-
 model PackagePlanLimit {
   id          String            @id @default(uuid()) @db.Uuid
   packageId   String            @map("package_id") @db.Uuid
-  limitKey    String            @map("limit_key") @db.VarChar(100)
+  limitKey    PackageLimitKey   @map("limit_key")
   limitValue  Int               @map("limit_value")
   resetCycle  PackageResetCycle @default(LIFETIME) @map("reset_cycle")
   description String?
@@ -87,6 +101,11 @@ model PackageAddon {
   price         Decimal             @default(0) @db.Decimal(12, 2)
   billingCycle  PackageBillingCycle @map("billing_cycle")
   currencyCode  String              @default("BDT") @map("currency_code") @db.VarChar(10)
+
+  limitKey      PackageLimitKey     @map("limit_key")
+  limitValue    Int                 @map("limit_value")
+  resetCycle    PackageResetCycle   @default(LIFETIME) @map("reset_cycle")
+
   status        PackageStatus       @default(ACTIVE)
   sortOrder     Int                 @default(0) @map("sort_order")
   createdBy     String?             @map("created_by") @db.Uuid
@@ -95,28 +114,12 @@ model PackageAddon {
   updatedAt     DateTime            @updatedAt @map("updated_at")
   deletedAt     DateTime?           @map("deleted_at")
 
-  limits        PackageAddonLimit[]
   subscriptions PackageSubscriptionAddon[]
 
   @@unique([name])
+  @@index([limitKey])
   @@index([status])
   @@map("package_addons")
-}
-
-model PackageAddonLimit {
-  id         String            @id @default(uuid()) @db.Uuid
-  addonId    String            @map("addon_id") @db.Uuid
-  limitKey   String            @map("limit_key") @db.VarChar(100)
-  limitValue Int               @map("limit_value")
-  resetCycle PackageResetCycle @default(LIFETIME) @map("reset_cycle")
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
-
-  addon      PackageAddon      @relation(fields: [addonId], references: [id], onDelete: Cascade)
-
-  @@unique([addonId, limitKey])
-  @@index([limitKey])
-  @@map("package_addon_limits")
 }
 
 model PackageSubscription {
@@ -171,7 +174,7 @@ model PackageSubscriptionAddon {
 model PackageUsageCounter {
   id             String              @id @default(uuid()) @db.Uuid
   subscriptionId String              @map("subscription_id") @db.Uuid
-  limitKey       String              @map("limit_key") @db.VarChar(100)
+  limitKey       PackageLimitKey     @map("limit_key")
   usedValue      Int                 @default(0) @map("used_value")
   periodStart    DateTime            @map("period_start")
   periodEnd      DateTime            @map("period_end")

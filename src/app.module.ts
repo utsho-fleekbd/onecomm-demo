@@ -7,6 +7,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BusinessModule } from "./modules/business/business.module";
 import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.middleware";
+import { AdminPackageModule } from './modules/admin_package/admin_package.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.mid
     PrismaModule,
     AuthModule,
     BusinessModule,
+    AdminPackageModule,
   ],
   controllers: [AppController],
   providers: [AppService],
