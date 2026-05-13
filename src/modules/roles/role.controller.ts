@@ -76,11 +76,10 @@ export class RoleController {
     summary: "Get role assignments of a business",
   })
   findAssignments(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Query() query: QueryRoleAssignmentsDto,
   ) {
-    return this.rolesService.findAssignments(currentUser, businessId, query);
+    return this.rolesService.findAssignments(businessId, query);
   }
 
   @RequirePermission(
@@ -92,11 +91,10 @@ export class RoleController {
     summary: "Get single business role",
   })
   findOne(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Param("roleId", ParseUUIDPipe) roleId: string,
   ) {
-    return this.rolesService.findOne(currentUser, businessId, roleId);
+    return this.rolesService.findOne(businessId, roleId);
   }
 
   @RequirePermission(
@@ -158,17 +156,11 @@ export class RoleController {
     summary: "Update role assignment",
   })
   updateAssignment(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Param("assignmentId", ParseUUIDPipe) assignmentId: string,
     @Body() dto: UpdateRoleAssignmentDto,
   ) {
-    return this.rolesService.updateAssignment(
-      currentUser,
-      businessId,
-      assignmentId,
-      dto,
-    );
+    return this.rolesService.updateAssignment(businessId, assignmentId, dto);
   }
 
   @RequirePermission(
@@ -180,14 +172,9 @@ export class RoleController {
     summary: "Revoke role assignment",
   })
   revokeAssignment(
-    @CurrentUser() currentUser: CurrentUserPayload,
     @Param("businessId", ParseUUIDPipe) businessId: string,
     @Param("assignmentId", ParseUUIDPipe) assignmentId: string,
   ) {
-    return this.rolesService.revokeAssignment(
-      currentUser,
-      businessId,
-      assignmentId,
-    );
+    return this.rolesService.revokeAssignment(businessId, assignmentId);
   }
 }

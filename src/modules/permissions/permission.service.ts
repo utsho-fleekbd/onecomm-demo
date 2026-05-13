@@ -69,13 +69,7 @@ export class PermissionService {
     });
   }
 
-  async findAll(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    query: QueryPermissionDto,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async findAll(businessId: string, query: QueryPermissionDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
@@ -119,25 +113,13 @@ export class PermissionService {
     });
   }
 
-  async findByRole(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    roleId: string,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
-
+  async findByRole(businessId: string, roleId: string) {
     const role = await this.getRoleWithPermissionsOrThrow(businessId, roleId);
 
     return apiResponse(role);
   }
 
-  async addToRole(
-    currentUser: CurrentUserPayload,
-    businessId: string,
-    roleId: string,
-    dto: AddPermissionDto,
-  ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
+  async addToRole(businessId: string, roleId: string, dto: AddPermissionDto) {
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const permissions = this.normalizePermissions(dto.permissions);
@@ -166,12 +148,10 @@ export class PermissionService {
   }
 
   async replaceRolePermissions(
-    currentUser: CurrentUserPayload,
     businessId: string,
     roleId: string,
     dto: UpdatePermissionDto,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const permissions = this.normalizePermissions(dto.permissions);
@@ -207,13 +187,11 @@ export class PermissionService {
   }
 
   async removeFromRole(
-    currentUser: CurrentUserPayload,
     businessId: string,
     roleId: string,
     feature: RbacFeature,
     action: PermissionAction,
   ) {
-    await this.businessService.assertCanAccessBusiness(currentUser, businessId);
     await this.assertRoleBelongsToBusiness(businessId, roleId);
 
     const result = await this.prisma.rbacRolePermission.deleteMany({

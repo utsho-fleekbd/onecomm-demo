@@ -1,14 +1,18 @@
 import { NestFactory } from "@nestjs/core";
+import { join } from "node:path";
 import { Logger, ValidationPipe } from "@nestjs/common";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
     logger: ["error", "warn", "log", "debug", "verbose"],
   });
+  const uploadRoot = process.env.MEDIA_UPLOAD_ROOT!;
+  const publicUploadPrefix = process.env.PUBLIC_UPLOAD_PREFIX!;
 
   app.enableCors({
     origin: "*",
@@ -17,6 +21,10 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix("api/v1");
+
+  app.useStaticAssets(join(process.cwd(), uploadRoot), {
+    prefix: publicUploadPrefix,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -48,7 +56,7 @@ async function bootstrap() {
     },
   });
 
-  const port = process.env.APP_PORT || 8080;
+  const port = process.env.APP_PORT!;
   const ip = process.env.APP_IP!;
 
   await app.listen(port, ip);
