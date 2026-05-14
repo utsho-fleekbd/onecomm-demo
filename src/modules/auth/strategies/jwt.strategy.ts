@@ -1,21 +1,24 @@
 import { Request } from "express";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
-import { SystemUserStatus, SystemUserType } from "@prisma/client";
 import { ExtractJwt, Strategy } from "passport-jwt";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { SystemUserStatus, SystemUserType } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { CurrentUserPayload } from "../decorators/current-user.decorator";
+import type { BusinessAccessContext } from "../../../common/request-context/request-context.types";
+import type { CurrentUserPayload } from "../decorators/current-user.decorator";
 
 export type JwtPayload = {
-  sub: number;
-  businessId: number | null;
+  sub: string;
+  businessId: string | null;
   type: SystemUserType;
 };
 
 export type AuthenticatedRequest = Request & {
   user: CurrentUserPayload;
+  businessId?: string | null;
+  businessContext?: BusinessAccessContext | null;
 };
 
 @Injectable()
@@ -42,6 +45,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
         email: true,
         type: true,
         status: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -53,6 +59,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       throw new UnauthorizedException("Account is not active");
     }
 
+    if (payload.type !== user.type) {
+      throw new UnauthorizedException("Invalid token");
+    }
+
     if (user.type === SystemUserType.ADMIN) {
       return {
         ...user,
@@ -62,31 +72,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
 
     if (!payload.businessId) {
       throw new UnauthorizedException("No business selected");
-    }
-
-    const business = await this.prisma.business.findFirst({
-      where: {
-        id: payload.businessId,
-        OR: [
-          {
-            ownerUserId: user.id,
-          },
-          {
-            members: {
-              some: {
-                userId: user.id,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!business) {
-      throw new UnauthorizedException("You do not have access to this store");
     }
 
     return {

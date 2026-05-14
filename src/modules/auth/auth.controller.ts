@@ -17,7 +17,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("register")
-  @ApiOperation({ summary: "Register admin and create first store" })
+  @ApiOperation({ summary: "Register admin and create first business" })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -29,17 +29,15 @@ export class AuthController {
   }
 
   @Post("refresh")
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Refresh the current access token" })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto);
   }
 
-  @Post("select-store")
+  @Post("select-business")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Select active store after login" })
+  @ApiOperation({ summary: "Select active business after login" })
   selectBusiness(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: SelectBusinessDto,
@@ -52,15 +50,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get authenticated user profile" })
   me(@CurrentUser() user: CurrentUserPayload) {
-    return this.authService.me(user.id, user.businessId);
+    return this.authService.me(user);
   }
 
   @Post("logout")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Logout current session" })
-  logout(@Body() dto: LogoutDto) {
-    return this.authService.logout(dto);
+  logout(@CurrentUser() user: CurrentUserPayload, @Body() dto: LogoutDto) {
+    return this.authService.logout(dto, user.id);
   }
 
   @Post("logout-all")

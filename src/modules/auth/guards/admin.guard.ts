@@ -1,4 +1,4 @@
-import { AuthenticatedRequest } from "../strategies/jwt.strategy";
+import { SystemUserType } from "@prisma/client";
 import {
   CanActivate,
   ExecutionContext,
@@ -7,8 +7,10 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 
+import { AuthenticatedRequest } from "../strategies/jwt.strategy";
+
 @Injectable()
-export class RequireBusinessAccess implements CanActivate {
+export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
@@ -17,7 +19,7 @@ export class RequireBusinessAccess implements CanActivate {
       throw new UnauthorizedException("Unauthorized");
     }
 
-    if (!user.businessId) {
+    if (user.type !== SystemUserType.ADMIN) {
       throw new ForbiddenException("Only admin can access this resource");
     }
 

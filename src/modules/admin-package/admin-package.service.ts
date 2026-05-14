@@ -36,10 +36,6 @@ import {
 export class AdminPackageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ======================================================
-  // PACKAGE PLANS
-  // ======================================================
-
   async createPlan(dto: CreatePackagePlanDto) {
     try {
       return await this.prisma.packagePlan.create({
@@ -414,15 +410,13 @@ export class AdminPackageService {
     });
   }
 
-  // ======================================================
-  // SUBSCRIPTIONS
-  // ======================================================
-
   async createSubscription(dto: CreatePackageSubscriptionDto) {
     const plan = await this.findPlanById(dto.packageId);
 
     if (plan.status !== PackageStatus.ACTIVE) {
-      throw new BadRequestException("Only active package plans can be assigned");
+      throw new BadRequestException(
+        "Only active package plans can be assigned",
+      );
     }
 
     const existing = await this.prisma.packageSubscription.findFirst({
@@ -598,7 +592,9 @@ export class AdminPackageService {
     const plan = await this.findPlanById(dto.packageId);
 
     if (plan.status !== PackageStatus.ACTIVE) {
-      throw new BadRequestException("Only active package plans can be assigned");
+      throw new BadRequestException(
+        "Only active package plans can be assigned",
+      );
     }
 
     const effectiveDate = dto.effectiveDate
@@ -644,9 +640,7 @@ export class AdminPackageService {
   ) {
     const subscription = await this.findSubscriptionById(subscriptionId);
 
-    const endedAt = dto.immediate
-      ? new Date()
-      : subscription.currentPeriodEnd;
+    const endedAt = dto.immediate ? new Date() : subscription.currentPeriodEnd;
 
     return this.prisma.packageSubscription.update({
       where: { id: subscription.id },
@@ -684,10 +678,6 @@ export class AdminPackageService {
       },
     });
   }
-
-  // ======================================================
-  // SUBSCRIPTION ADDONS
-  // ======================================================
 
   async addSubscriptionAddon(
     subscriptionId: string,
@@ -757,10 +747,6 @@ export class AdminPackageService {
       },
     });
   }
-
-  // ======================================================
-  // USAGE COUNTERS
-  // ======================================================
 
   async getSubscriptionUsage(subscriptionId: string) {
     await this.findSubscriptionById(subscriptionId);
@@ -885,10 +871,6 @@ export class AdminPackageService {
       a.limitKey.localeCompare(b.limitKey),
     );
   }
-
-  // ======================================================
-  // PRIVATE HELPERS
-  // ======================================================
 
   private async findPlanLimitById(id: string) {
     const limit = await this.prisma.packagePlanLimit.findUnique({

@@ -50,12 +50,11 @@ export class QueryBusinessDto {
 
   @ApiPropertyOptional({
     example: "createdAt",
-    enum: ["id", "name", "slug", "status", "createdAt", "updatedAt"],
+    enum: ["id", "name", "status", "createdAt", "updatedAt"],
   })
   @IsOptional()
-  @IsIn(["id", "name", "slug", "status", "createdAt", "updatedAt"])
-  sortBy?: "id" | "name" | "slug" | "status" | "createdAt" | "updatedAt" =
-    "createdAt";
+  @IsIn(["id", "name", "status", "createdAt", "updatedAt"])
+  sortBy?: "id" | "name" | "status" | "createdAt" | "updatedAt" = "createdAt";
 
   @ApiPropertyOptional({
     example: "desc",

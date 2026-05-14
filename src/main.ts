@@ -1,11 +1,18 @@
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+import { join } from "node:path";
+import { Logger, ValidationPipe } from "@nestjs/common";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+    logger: ["error", "warn", "log", "debug", "verbose"],
+  });
+  const uploadRoot = process.env.MEDIA_UPLOAD_ROOT!;
+  const publicUploadPrefix = process.env.PUBLIC_UPLOAD_PREFIX!;
 
   app.enableCors({
     origin: "*",
@@ -14,6 +21,10 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix("api/v1");
+
+  app.useStaticAssets(join(process.cwd(), uploadRoot), {
+    prefix: publicUploadPrefix,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -45,13 +56,15 @@ async function bootstrap() {
     },
   });
 
-  const port = process.env.APP_PORT || 8080;
+  const port = process.env.APP_PORT!;
   const ip = process.env.APP_IP!;
 
   await app.listen(port, ip);
 
-  console.log(`Server running on http://${ip}:${port}/api/v1`);
-  console.log(`Swagger running on http://${ip}:${port}/api/v1/docs`);
+  const logger = new Logger("Bootstrap");
+
+  logger.log(`Server running on http://${ip}:${port}/api/v1`);
+  logger.log(`Swagger running on http://${ip}:${port}/api/v1/docs`);
 }
 
 bootstrap();

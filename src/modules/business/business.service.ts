@@ -1,23 +1,36 @@
 import {
-  BadRequestException,
+  BusinessMemberStatus,
+  BusinessStatus,
+  Prisma,
+  SystemUserType,
+} from "@prisma/client";
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { BusinessStatus, Prisma, SystemUserType } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
 import { CreateBusinessDto } from "./dto/create-business.dto";
+import { RequestContextService } from "../../common/request-context/request-context.service";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import {
+  apiResponse,
+  paginatedResponse,
+} from "../../common/utils/api-response.util";
+import {
+  BusinessAccessContext,
+  getBusinessAccessCacheKey,
+} from "../../common/request-context/request-context.types";
+import { generateRandomSlug } from "../../common/utils/slug-generator.util";
 
 const BUSINESS_INCLUDE = {
   ownerUser: {
     select: {
       id: true,
-      uuid: true,
       name: true,
       email: true,
       type: true,
@@ -34,14 +47,40 @@ const BUSINESS_INCLUDE = {
   },
 } satisfies Prisma.BusinessInclude;
 
+const ACCESSIBLE_BUSINESS_STATUSES = [
+  BusinessStatus.TRIAL,
+  BusinessStatus.ACTIVE,
+] satisfies BusinessStatus[];
+
+const BUSINESS_SLUG_MAX_LENGTH = 180;
+const BUSINESS_SLUG_RETRY_LIMIT = 5;
+
 @Injectable()
 export class BusinessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly requestContext: RequestContextService,
+  ) {}
 
-  async create(userId: number, dto: CreateBusinessDto) {
-    const slug = this.normalizeSlug(dto.slug || dto.name);
+  async create(
+    userId: string,
+    userType: SystemUserType,
+    dto: CreateBusinessDto,
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (userType !== SystemUserType.TENANT) {
+      throw new ForbiddenException(
+        "You do not have permission to create businesses",
+      );
+    }
 
-    await this.ensureSlugAvailable(slug);
+    const client = tx ?? this.prisma;
+
+    const slug = await this.generateUniqueBusinessSlug(
+      dto.name,
+      userId,
+      client,
+    );
 
     const settingsData = dto.settings
       ? this.buildBusinessSettingData(dto.settings)
@@ -49,10 +88,10 @@ export class BusinessService {
 
     const brandingData = dto.branding
       ? this.buildBusinessBrandingData(dto.branding)
-      : null;
+      : {};
 
     try {
-      return await this.prisma.business.create({
+      const business = await client.business.create({
         data: {
           name: dto.name.trim(),
           slug,
@@ -79,15 +118,14 @@ export class BusinessService {
             create: settingsData,
           },
 
-          ...(brandingData &&
-            this.hasKeys(brandingData) && {
-              branding: {
-                create: brandingData,
-              },
-            }),
+          branding: {
+            create: brandingData,
+          },
         },
         include: BUSINESS_INCLUDE,
       });
+
+      return apiResponse(business, "Business created successfully");
     } catch (error) {
       this.handlePrismaError(error);
     }
@@ -95,7 +133,7 @@ export class BusinessService {
 
   async findAll(currentUser: CurrentUserPayload, query: QueryBusinessDto) {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const sortBy = query.sortBy ?? "createdAt";
@@ -104,16 +142,81 @@ export class BusinessService {
     const canIncludeDeleted =
       currentUser.type === SystemUserType.ADMIN && query.includeDeleted;
 
+    const searchWhere: Prisma.BusinessWhereInput | undefined = query.search
+      ? {
+          OR: [
+            {
+              name: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              slug: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              phone: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+            {
+              country: {
+                contains: query.search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        }
+      : undefined;
+
+    const statusWhere: Prisma.BusinessWhereInput =
+      currentUser.type === SystemUserType.ADMIN
+        ? {
+            ...(query.status && {
+              status: query.status,
+            }),
+          }
+        : {
+            ...(query.status
+              ? {
+                  AND: [
+                    {
+                      status: {
+                        in: ACCESSIBLE_BUSINESS_STATUSES,
+                      },
+                    },
+                    {
+                      status: query.status,
+                    },
+                  ],
+                }
+              : {
+                  status: {
+                    in: ACCESSIBLE_BUSINESS_STATUSES,
+                  },
+                }),
+          };
+
     const where: Prisma.BusinessWhereInput = {
       ...(!canIncludeDeleted && {
         deletedAt: null,
       }),
 
-      ...this.getBusinessAccessWhere(currentUser),
-
-      ...(query.status && {
-        status: query.status,
-      }),
+      AND: [
+        this.getBusinessAccessWhere(currentUser),
+        statusWhere,
+        ...(searchWhere ? [searchWhere] : []),
+      ],
 
       ...(query.country && {
         country: {
@@ -128,73 +231,33 @@ export class BusinessService {
           mode: "insensitive",
         },
       }),
-
-      ...(query.search && {
-        OR: [
-          {
-            name: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            slug: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            email: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            phone: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-          {
-            country: {
-              contains: query.search,
-              mode: "insensitive",
-            },
-          },
-        ],
-      }),
     };
 
     const orderBy: Prisma.BusinessOrderByWithRelationInput = {
       [sortBy]: sortOrder,
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.business.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include: BUSINESS_INCLUDE,
-      }),
+    const items = await this.prisma.business.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: BUSINESS_INCLUDE,
+    });
 
-      this.prisma.business.count({
-        where,
-      }),
-    ]);
+    const total = await this.prisma.business.count({
+      where,
+    });
 
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      items,
-    };
+    return paginatedResponse(items, {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
-  async findOne(currentUser: CurrentUserPayload, businessId: number) {
+  async findOne(currentUser: CurrentUserPayload, businessId: string) {
     const business = await this.prisma.business.findFirst({
       where: {
         id: businessId,
@@ -208,22 +271,15 @@ export class BusinessService {
       throw new NotFoundException("Business not found");
     }
 
-    return business;
+    return apiResponse(business);
   }
 
   async update(
     currentUser: CurrentUserPayload,
-    businessId: number,
+    businessId: string,
     dto: UpdateBusinessDto,
   ) {
     await this.assertCanManageBusiness(currentUser, businessId);
-
-    let slug: string | undefined;
-
-    if (dto.slug !== undefined) {
-      slug = this.normalizeSlug(dto.slug);
-      await this.ensureSlugAvailable(slug, businessId);
-    }
 
     const settingData = dto.settings
       ? this.buildBusinessSettingData(dto.settings)
@@ -236,10 +292,6 @@ export class BusinessService {
     const data: Prisma.BusinessUpdateInput = {
       ...(dto.name !== undefined && {
         name: dto.name.trim(),
-      }),
-
-      ...(slug !== undefined && {
-        slug,
       }),
 
       ...(dto.email !== undefined && {
@@ -294,20 +346,29 @@ export class BusinessService {
     };
 
     try {
-      return await this.prisma.business.update({
+      const business = await this.prisma.business.update({
         where: {
           id: businessId,
         },
         data,
         include: BUSINESS_INCLUDE,
       });
+
+      return apiResponse(business, "Business updated successfully");
     } catch (error) {
       this.handlePrismaError(error);
     }
   }
 
-  async remove(currentUser: CurrentUserPayload, businessId: number) {
+  async remove(currentUser: CurrentUserPayload, businessId: string) {
     await this.assertCanManageBusiness(currentUser, businessId);
+
+    const businessCount = await this.prisma.business.count();
+    if (businessCount <= 1) {
+      throw new ForbiddenException(
+        "You must have at least one active business",
+      );
+    }
 
     await this.prisma.business.update({
       where: {
@@ -324,9 +385,7 @@ export class BusinessService {
       },
     });
 
-    return {
-      message: "Business deleted successfully",
-    };
+    return apiResponse(null, "Business deleted successfully");
   }
 
   private getBusinessAccessWhere(
@@ -345,6 +404,7 @@ export class BusinessService {
           members: {
             some: {
               userId: currentUser.id,
+              status: BusinessMemberStatus.ACTIVE,
               deletedAt: null,
             },
           },
@@ -353,25 +413,33 @@ export class BusinessService {
     };
   }
 
-  private async assertCanManageBusiness(
+  async assertCanAccessBusiness(
     currentUser: CurrentUserPayload,
-    businessId: number,
-  ) {
+    businessId: string,
+  ): Promise<BusinessAccessContext> {
+    const cacheKey = getBusinessAccessCacheKey(currentUser.id, businessId);
+    const cachedAccess = this.requestContext.getBusinessAccess(cacheKey);
+
+    if (cachedAccess) {
+      return cachedAccess;
+    }
+
     const where: Prisma.BusinessWhereInput = {
       id: businessId,
       deletedAt: null,
-
-      ...(currentUser.type === SystemUserType.ADMIN
-        ? {}
-        : {
-            ownerUserId: currentUser.id,
-          }),
+      ...(currentUser.type !== SystemUserType.ADMIN && {
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
+        ...this.getBusinessAccessWhere(currentUser),
+      }),
     };
 
     const business = await this.prisma.business.findFirst({
       where,
       select: {
         id: true,
+        ownerUserId: true,
       },
     });
 
@@ -380,26 +448,23 @@ export class BusinessService {
         "You do not have permission for this business",
       );
     }
+
+    const accessContext = {
+      businessId: business.id,
+      isAdmin: currentUser.type === SystemUserType.ADMIN,
+      isOwner: business.ownerUserId === currentUser.id,
+    };
+
+    this.requestContext.setBusinessAccess(cacheKey, accessContext);
+
+    return accessContext;
   }
 
-  private async ensureSlugAvailable(slug: string, ignoreBusinessId?: number) {
-    const existingBusiness = await this.prisma.business.findFirst({
-      where: {
-        slug,
-        ...(ignoreBusinessId && {
-          id: {
-            not: ignoreBusinessId,
-          },
-        }),
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingBusiness) {
-      throw new ConflictException("Business slug already exists");
-    }
+  async assertCanManageBusiness(
+    currentUser: CurrentUserPayload,
+    businessId: string,
+  ) {
+    return this.assertCanAccessBusiness(currentUser, businessId);
   }
 
   private buildBusinessSettingData(
@@ -412,18 +477,6 @@ export class BusinessService {
 
       ...(dto.invoicePrefix !== undefined && {
         invoicePrefix: dto.invoicePrefix.trim().toUpperCase(),
-      }),
-
-      ...(dto.defaultLanguage !== undefined && {
-        defaultLanguage: dto.defaultLanguage.trim().toLowerCase(),
-      }),
-
-      ...(dto.defaultCurrency !== undefined && {
-        defaultCurrency: dto.defaultCurrency.trim().toUpperCase(),
-      }),
-
-      ...(dto.timezone !== undefined && {
-        timezone: dto.timezone.trim(),
       }),
 
       ...(dto.lowStockThreshold !== undefined && {
@@ -486,24 +539,33 @@ export class BusinessService {
     };
   }
 
-  private normalizeSlug(value: string) {
-    const slug = value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+  private async generateUniqueBusinessSlug(
+    name: string,
+    ownerUserId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    for (let attempt = 0; attempt < BUSINESS_SLUG_RETRY_LIMIT; attempt++) {
+      const slug = generateRandomSlug(name, {
+        fallback: "business",
+        maxLength: BUSINESS_SLUG_MAX_LENGTH,
+      });
 
-    if (!slug) {
-      throw new BadRequestException("Invalid business slug");
+      const existingBusiness = await client.business.findFirst({
+        where: {
+          slug,
+          ownerUserId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existingBusiness) {
+        return slug;
+      }
     }
 
-    if (slug.length > 180) {
-      throw new BadRequestException(
-        "Business slug must be less than 180 characters",
-      );
-    }
-
-    return slug;
+    throw new ConflictException("Could not generate a unique business slug");
   }
 
   private normalizeEmail(email: string) {

@@ -1,17 +1,21 @@
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   Body,
   Controller,
   Delete,
   Get,
   Param,
-  ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { PackageLimitKey } from "@prisma/client";
-import { AdminPackageService } from "./admin_package.service";
+
+import { AdminGuard } from "../auth/guards/admin.guard";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+
+import { AdminPackageService } from "./admin-package.service";
 import {
   CancelPackageSubscriptionDto,
   ChangePackageSubscriptionPlanDto,
@@ -20,23 +24,20 @@ import {
   CreatePackagePlanLimitDto,
   CreatePackageSubscriptionAddonDto,
   CreatePackageSubscriptionDto,
-  IncrementPackageUsageDto,
   PaginationQueryDto,
   RenewPackageSubscriptionDto,
   UpdatePackageAddonDto,
   UpdatePackagePlanDto,
   UpdatePackagePlanLimitDto,
   UpdatePackageSubscriptionAddonDto,
-  UpsertPackageUsageCounterDto,
 } from "./dto/admin-package.dto";
 
+@ApiTags("AdminPackage")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, AdminGuard)
 @Controller("admin/package")
 export class AdminPackageController {
   constructor(private readonly adminPackageService: AdminPackageService) {}
-
-  // ======================================================
-  // PACKAGE PLANS
-  // ======================================================
 
   @Post("plans")
   createPlan(@Body() dto: CreatePackagePlanDto) {
@@ -205,7 +206,9 @@ export class AdminPackageController {
   removeSubscriptionAddon(
     @Param("subscriptionAddonId", ParseUUIDPipe) subscriptionAddonId: string,
   ) {
-    return this.adminPackageService.removeSubscriptionAddon(subscriptionAddonId);
+    return this.adminPackageService.removeSubscriptionAddon(
+      subscriptionAddonId,
+    );
   }
 
   // ======================================================

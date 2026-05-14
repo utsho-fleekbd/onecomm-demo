@@ -1,6 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
+import { Prisma, PrismaClient } from "@prisma/client";
 import {
   Injectable,
   Logger,
@@ -8,16 +8,29 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 
+const prismaLogOptions = [
+  {
+    emit: "event" as const,
+    level: "query" as const,
+  },
+  {
+    emit: "event" as const,
+    level: "warn" as const,
+  },
+  {
+    emit: "event" as const,
+    level: "error" as const,
+  },
+] satisfies Prisma.PrismaClientOptions["log"];
+
+type PrismaLogLevel = "query" | "warn" | "error";
+
 @Injectable()
 export class PrismaService
-  extends PrismaClient
+  extends PrismaClient<Prisma.PrismaClientOptions, PrismaLogLevel>
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger("Prisma");
-
-  private readonly slowQueryMs = Number(process.env.SLOW_QUERY_MS ?? 300);
-  private readonly logAllQueries = process.env.PRISMA_QUERY_LOG === "true";
-  private readonly logQueryParams = process.env.PRISMA_QUERY_PARAMS === "true";
 
   constructor(configService: ConfigService) {
     const databaseUrl = configService.getOrThrow<string>("DATABASE_URL");
@@ -26,49 +39,37 @@ export class PrismaService
       connectionString: databaseUrl,
     });
 
-    super({
+    const options = {
       adapter,
-      log: [
-        { emit: "event", level: "query" },
-        { emit: "stdout", level: "error" },
-        { emit: "stdout", level: "warn" },
-      ],
-    });
+      log: prismaLogOptions,
+    } satisfies Prisma.PrismaClientOptions;
+
+    super(options);
   }
 
   async onModuleInit() {
-    // this.$on("query", (event) => {
-    //   const isSlowQuery = event.duration >= this.slowQueryMs;
+    this.$on("query", (event) => {
+      const operation = this.getQueryOperation(event.query);
 
-    //   if (!this.logAllQueries && !isSlowQuery) {
-    //     return;
-    //   }
+      if (this.isTransactionQuery(operation)) {
+        return;
+      }
 
-    //   const query = this.compactSql(event.query);
+      const tables = this.getQueriedTables(event.query);
+      const tableLabel = tables.length > 0 ? tables.join(",") : "unknown";
 
-    //   const message = [
-    //     `${event.duration}ms`,
-    //     query,
-    //     this.logQueryParams ? `params=${event.params}` : "",
-    //   ]
-    //     .filter(Boolean)
-    //     .join(" ");
+      const message = `${operation} ${tableLabel} ${event.duration}ms`;
 
-    //   if (isSlowQuery) {
-    //     this.logger.warn(`Slow query: ${message}`);
-    //     return;
-    //   }
+      this.logger.debug(message);
+    });
 
-    //   this.logger.debug(message);
-    // });
+    this.$on("warn", (event) => {
+      this.logger.warn(event.message);
+    });
 
-    // this.$on("warn", (event) => {
-    //   this.logger.warn(event.message);
-    // });
-
-    // this.$on("error", (event) => {
-    //   this.logger.error(event.message);
-    // });
+    this.$on("error", (event) => {
+      this.logger.error(event.message);
+    });
 
     await this.$connect();
   }
@@ -77,7 +78,34 @@ export class PrismaService
     await this.$disconnect();
   }
 
-  private compactSql(query: string) {
-    return query.replace(/\s+/g, " ").trim();
+  private getQueryOperation(query: string) {
+    return query.trim().split(/\s+/)[0]?.toUpperCase() || "QUERY";
+  }
+
+  private isTransactionQuery(operation: string) {
+    return ["BEGIN", "COMMIT", "ROLLBACK"].includes(operation);
+  }
+
+  private getQueriedTables(query: string) {
+    const tableRegex =
+      /\b(?:FROM|JOIN|INTO|UPDATE)\s+(?:(?:"[^"]+"\.)?"([^"]+)"|([a-zA-Z_][\w.]*))/gi;
+
+    const tables = new Set<string>();
+
+    for (const match of query.matchAll(tableRegex)) {
+      const rawTable = match[1] || match[2];
+
+      if (!rawTable) {
+        continue;
+      }
+
+      const table = rawTable.split(".").pop();
+
+      if (table) {
+        tables.add(table);
+      }
+    }
+
+    return [...tables];
   }
 }

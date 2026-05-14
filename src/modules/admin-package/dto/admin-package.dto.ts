@@ -1,5 +1,13 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  PackageBillingCycle,
+  PackageLimitKey,
+  PackageResetCycle,
+  PackageStatus,
+  PackageSubscriptionAddonStatus,
+  PackageSubscriptionStatus,
+} from "@prisma/client";
 import {
   IsBoolean,
   IsDateString,
@@ -13,14 +21,6 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
-import {
-  PackageBillingCycle,
-  PackageLimitKey,
-  PackageResetCycle,
-  PackageStatus,
-  PackageSubscriptionAddonStatus,
-  PackageSubscriptionStatus,
-} from "@prisma/client";
 
 export class PaginationQueryDto {
   @ApiPropertyOptional({ example: 1 })
@@ -30,22 +30,18 @@ export class PaginationQueryDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ example: 20 })
+  @ApiPropertyOptional({ example: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number = 20;
+  limit?: number = 10;
 
   @ApiPropertyOptional({ example: "Starter" })
   @IsOptional()
   @IsString()
   search?: string;
 }
-
-// ======================================================
-// PACKAGE PLAN DTOs
-// ======================================================
 
 export class CreatePackagePlanDto {
   @ApiProperty({ example: "Starter" })
@@ -156,10 +152,6 @@ export class UpdatePackagePlanDto {
   sortOrder?: number;
 }
 
-// ======================================================
-// PACKAGE PLAN LIMIT DTOs
-// ======================================================
-
 export class CreatePackagePlanLimitDto {
   @ApiProperty({
     enum: PackageLimitKey,
@@ -218,10 +210,6 @@ export class UpdatePackagePlanLimitDto {
   @IsString()
   description?: string;
 }
-
-// ======================================================
-// ADDON DTOs
-// ======================================================
 
 export class CreatePackageAddonDto {
   @ApiProperty({ example: "Extra SMS Pack" })
@@ -377,10 +365,6 @@ export class UpdatePackageAddonDto {
   updatedBy?: string;
 }
 
-// ======================================================
-// SUBSCRIPTION DTOs
-// ======================================================
-
 export class CreatePackageSubscriptionDto {
   @ApiProperty({ example: "8c01a8c9-87d2-4f4f-bb99-9f3f3a123456" })
   @IsUUID()
@@ -449,10 +433,6 @@ export class RenewPackageSubscriptionDto {
   startDate?: string;
 }
 
-// ======================================================
-// SUBSCRIPTION ADDON DTOs
-// ======================================================
-
 export class CreatePackageSubscriptionAddonDto {
   @ApiProperty({ example: "8c01a8c9-87d2-4f4f-bb99-9f3f3a123456" })
   @IsUUID()
@@ -482,10 +462,6 @@ export class UpdatePackageSubscriptionAddonDto {
   @IsEnum(PackageSubscriptionAddonStatus)
   status?: PackageSubscriptionAddonStatus;
 }
-
-// ======================================================
-// USAGE DTOs
-// ======================================================
 
 export class UpsertPackageUsageCounterDto {
   @ApiProperty({

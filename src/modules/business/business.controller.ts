@@ -1,47 +1,52 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from "@nestjs/common";
+import { PermissionAction, RbacFeature } from "@prisma/client";
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 
 import { BusinessService } from "./business.service";
 import { QueryBusinessDto } from "./dto/query-business.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CreateBusinessDto } from "./dto/create-business.dto";
 import { UpdateBusinessDto } from "./dto/update-business.dto";
+import { BusinessGuard } from "./guards/business.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { RequireBusinessAccess } from "../auth/guards/require-business-access";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
+import { PermissionGuard } from "../permissions/guards/permission.guard";
 
 @ApiTags("Business")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RequireBusinessAccess)
+@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
 @Controller("businesses")
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
+  @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.CREATE)
   @Post()
   @ApiOperation({ summary: "Create business" })
   create(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateBusinessDto,
   ) {
-    return this.businessService.create(user.id, dto);
+    return this.businessService.create(user.id, user.type, dto);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.READ)
   @Get()
   @ApiOperation({ summary: "Get businesses" })
   findAll(
@@ -51,33 +56,45 @@ export class BusinessController {
     return this.businessService.findAll(user, query);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.READ)
   @Get(":businessId")
   @ApiOperation({ summary: "Get business details" })
-  @ApiParam({ name: "businessId", example: 1 })
+  @ApiParam({
+    name: "businessId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
   findOne(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
   ) {
     return this.businessService.findOne(user, businessId);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.UPDATE)
   @Patch(":businessId")
   @ApiOperation({ summary: "Update business" })
-  @ApiParam({ name: "businessId", example: 1 })
+  @ApiParam({
+    name: "businessId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
   update(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
     @Body() dto: UpdateBusinessDto,
   ) {
     return this.businessService.update(user, businessId, dto);
   }
 
+  @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.DELETE)
   @Delete(":businessId")
   @ApiOperation({ summary: "Delete business" })
-  @ApiParam({ name: "businessId", example: 1 })
+  @ApiParam({
+    name: "businessId",
+    example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913",
+  })
   remove(
     @CurrentUser() user: CurrentUserPayload,
-    @Param("businessId", ParseIntPipe) businessId: number,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
   ) {
     return this.businessService.remove(user, businessId);
   }

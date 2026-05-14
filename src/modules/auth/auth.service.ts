@@ -2,7 +2,13 @@ import * as argon2 from "argon2";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes } from "node:crypto";
-import { SystemUser, SystemUserStatus, SystemUserType } from "@prisma/client";
+import {
+  BusinessMemberStatus,
+  BusinessStatus,
+  SystemUser,
+  SystemUserStatus,
+  SystemUserType,
+} from "@prisma/client";
 import {
   ConflictException,
   ForbiddenException,
@@ -17,17 +23,25 @@ import { JwtPayload } from "./strategies/jwt.strategy";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SelectBusinessDto } from "./dto/select-business.dto";
+import { BusinessService } from "../business/business.service";
+import { apiResponse } from "../../common/utils/api-response.util";
+import type { CurrentUserPayload } from "./decorators/current-user.decorator";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
 type AuthBusiness = {
-  id: number;
-  ownerUserId: number;
+  id: string;
+  ownerUserId: string;
   members: {
-    id: number;
-    userId: number;
+    id: string;
+    userId: string;
   }[];
 };
+
+const ACCESSIBLE_BUSINESS_STATUSES = [
+  BusinessStatus.TRIAL,
+  BusinessStatus.ACTIVE,
+] satisfies BusinessStatus[];
 
 @Injectable()
 export class AuthService {
@@ -35,6 +49,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly businessService: BusinessService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -59,8 +74,10 @@ export class AuthService {
           name: dto.name,
           email,
           passwordHash,
-
           type: SystemUserType.TENANT,
+          profile: {
+            create: {},
+          },
         },
         select: {
           id: true,
@@ -69,22 +86,25 @@ export class AuthService {
           type: true,
           status: true,
           createdAt: true,
+          updatedAt: true,
+          profile: true,
         },
       });
 
-      const selectedBusiness = await tx.business.create({
-        data: {
-          name: "New Business",
-          slug: "new-business",
-          ownerUserId: user.id,
+      const selectedBusinessResponse = await this.businessService.create(
+        user.id,
+        user.type,
+        {
+          name: dto.businessName,
         },
-        select: this.getBusinessSelect(user.id),
-      });
+        tx,
+      );
+      const selectedBusiness = selectedBusinessResponse.data;
 
-      return {
-        selectedBusiness,
+      return apiResponse({
         user,
-      };
+        selectedBusiness,
+      });
     });
   }
 
@@ -119,11 +139,11 @@ export class AuthService {
         businessId: null,
       });
 
-      return {
+      return apiResponse({
         ...tokens,
         selectedBusiness: null,
         user: safeUser,
-      };
+      });
     }
 
     const businesses = await this.findAccessibleBusinesses(user.id);
@@ -140,12 +160,12 @@ export class AuthService {
       businessId: selectedBusiness.id,
     });
 
-    return {
+    return apiResponse({
       ...tokens,
       selectedBusiness,
       businesses,
       user: safeUser,
-    };
+    });
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -234,15 +254,15 @@ export class AuthService {
       });
     });
 
-    return {
+    return apiResponse({
       accessToken,
       refreshToken: newRefreshToken,
       selectedBusiness,
       user: this.toSafeUser(user),
-    };
+    });
   }
 
-  async selectBusiness(userId: number, dto: SelectBusinessDto) {
+  async selectBusiness(userId: string, dto: SelectBusinessDto) {
     const user = await this.prisma.systemUser.findUnique({
       where: {
         id: userId,
@@ -276,37 +296,22 @@ export class AuthService {
       business.id,
     );
 
-    return {
+    return apiResponse({
       accessToken,
       selectedBusiness: business,
       user,
-    };
+    });
   }
 
-  async me(userId: number, businessId: number | null) {
-    const user = await this.prisma.systemUser.findUnique({
-      where: {
-        id: userId,
-      },
-      omit: {
-        passwordHash: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException("Invalid authenticated user");
-    }
-
-    this.assertActiveUser(user);
-
+  async me(user: CurrentUserPayload) {
     if (user.type === SystemUserType.ADMIN) {
-      return {
+      return apiResponse({
         user,
         selectedBusiness: null,
-      };
+      });
     }
 
-    const businesses = await this.findAccessibleBusinesses(userId);
+    const businesses = await this.findAccessibleBusinesses(user.id);
 
     if (businesses.length === 0) {
       throw new ForbiddenException("You are not assigned to any business");
@@ -314,9 +319,9 @@ export class AuthService {
 
     let selectedBusiness: AuthBusiness | null = null;
 
-    if (businessId !== null) {
+    if (user.businessId !== null) {
       selectedBusiness =
-        businesses.find((business) => business.id === businessId) ?? null;
+        businesses.find((business) => business.id === user.businessId) ?? null;
 
       if (!selectedBusiness) {
         throw new ForbiddenException(
@@ -325,14 +330,14 @@ export class AuthService {
       }
     }
 
-    return {
+    return apiResponse({
       user,
       selectedBusiness,
       businesses,
-    };
+    });
   }
 
-  async logout(dto: LogoutDto, userId?: number) {
+  async logout(dto: LogoutDto, userId?: string) {
     const refreshTokenHash = this.hashRefreshToken(dto.refreshToken);
 
     await this.prisma.systemSession.updateMany({
@@ -346,17 +351,13 @@ export class AuthService {
       },
     });
 
-    return {
-      message: "Logged out successfully",
-    };
+    return apiResponse(null, "Logged out successfully");
   }
 
-  async logoutAll(userId: number) {
+  async logoutAll(userId: string) {
     await this.revokeAllUserSessions(userId);
 
-    return {
-      message: "Logged out from all devices successfully",
-    };
+    return apiResponse(null, "Logged out from all devices successfully");
   }
 
   private async issueTokenPair(payload: JwtPayload) {
@@ -410,9 +411,9 @@ export class AuthService {
   }
 
   private async resolveSelectedBusiness(
-    userId: number,
+    userId: string,
     userType: SystemUserType,
-    requestedBusinessId: number | null,
+    requestedBusinessId: string | null,
   ): Promise<AuthBusiness | null> {
     if (userType === SystemUserType.ADMIN) {
       return null;
@@ -441,12 +442,16 @@ export class AuthService {
   }
 
   private async findAccessibleBusiness(
-    userId: number,
-    businessId: number,
+    userId: string,
+    businessId: string,
   ): Promise<AuthBusiness | null> {
     return this.prisma.business.findFirst({
       where: {
         id: businessId,
+        deletedAt: null,
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
         OR: [
           {
             ownerUserId: userId,
@@ -455,6 +460,8 @@ export class AuthService {
             members: {
               some: {
                 userId,
+                status: BusinessMemberStatus.ACTIVE,
+                deletedAt: null,
               },
             },
           },
@@ -465,10 +472,14 @@ export class AuthService {
   }
 
   private async findAccessibleBusinesses(
-    userId: number,
+    userId: string,
   ): Promise<AuthBusiness[]> {
     return this.prisma.business.findMany({
       where: {
+        deletedAt: null,
+        status: {
+          in: ACCESSIBLE_BUSINESS_STATUSES,
+        },
         OR: [
           {
             ownerUserId: userId,
@@ -477,6 +488,8 @@ export class AuthService {
             members: {
               some: {
                 userId,
+                status: BusinessMemberStatus.ACTIVE,
+                deletedAt: null,
               },
             },
           },
@@ -490,13 +503,13 @@ export class AuthService {
   }
 
   private async bindRefreshSessionToBusiness(
-    userId: number,
+    userId: string,
     refreshToken: string,
-    businessId: number,
+    businessId: string,
   ) {
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
 
-    await this.prisma.systemSession.updateMany({
+    const result = await this.prisma.systemSession.updateMany({
       where: {
         userId,
         refreshTokenHash,
@@ -509,9 +522,13 @@ export class AuthService {
         businessId,
       },
     });
+
+    if (result.count !== 1) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
   }
 
-  private async revokeAllUserSessions(userId: number) {
+  private async revokeAllUserSessions(userId: string) {
     await this.prisma.systemSession.updateMany({
       where: {
         userId,
@@ -523,7 +540,7 @@ export class AuthService {
     });
   }
 
-  private getBusinessSelect(userId: number) {
+  private getBusinessSelect(userId: string) {
     return {
       id: true,
       name: true,
@@ -531,6 +548,8 @@ export class AuthService {
       members: {
         where: {
           userId,
+          status: BusinessMemberStatus.ACTIVE,
+          deletedAt: null,
         },
       },
     } as const;
