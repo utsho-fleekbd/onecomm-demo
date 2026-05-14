@@ -26,16 +26,26 @@ import { UpdateEmployeeDto } from "./dto/update-employee.dto";
 import { UpdateEmployeeStatusDto } from "./dto/update-employee-status.dto";
 import { EmployeeService } from "./employee.service";
 import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
-import { PermissionAction, RbacFeature } from "@prisma/client";
+import { PackageLimitKey, PermissionAction, RbacFeature } from "@prisma/client";
+import { PackageLimitGuard } from "../packages/guards/package-limit.guard";
+import { RequirePackageLimit } from "../packages/decorators/require-package-limit.decorator";
+import { SubscriptionGuard } from "../packages/guards/subscription.guard";
 
 @ApiTags("Employees")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SubscriptionGuard,
+  BusinessGuard,
+  PermissionGuard,
+  PackageLimitGuard,
+)
 @Controller("employees/businesses/:businessId")
 export class EmployeeController {
   constructor(private readonly employeeService: EmployeeService) {}
 
   @RequirePermission(RbacFeature.EMPLOYEE_MANAGEMENT, PermissionAction.CREATE)
+  @RequirePackageLimit(PackageLimitKey.MAX_EMPLOYEES)
   @Post()
   @ApiOperation({
     summary: "Create employee for a business",

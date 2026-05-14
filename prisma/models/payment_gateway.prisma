@@ -39,10 +39,8 @@ enum PaymentWebhookStatus {
   IGNORED
 }
 
-
 // ======================================================
-// PAYMENT GATEWAY
-// table: payment_gateways
+// Models
 // ======================================================
 
 model PaymentGateway {
@@ -65,12 +63,6 @@ model PaymentGateway {
   @@index([status])
   @@map("payment_gateways")
 }
-
-
-// ======================================================
-// PAYMENT GATEWAY CONFIG
-// table: payment_gateway_configs
-// ======================================================
 
 model PaymentGatewayConfig {
   id          String                     @id @default(uuid()) @db.Uuid
@@ -96,12 +88,6 @@ model PaymentGatewayConfig {
   @@map("payment_gateway_configs")
 }
 
-
-// ======================================================
-// PAYMENT METHOD
-// table: payment_methods
-// ======================================================
-
 model PaymentMethod {
   id          String              @id @default(uuid()) @db.Uuid
   businessId  String              @map("business_id") @db.Uuid
@@ -125,12 +111,6 @@ model PaymentMethod {
   @@index([status])
   @@map("payment_methods")
 }
-
-
-// ======================================================
-// PAYMENT WEBHOOK EVENT
-// table: payment_webhook_events
-// ======================================================
 
 model PaymentWebhookEvent {
   id             String               @id @default(uuid()) @db.Uuid

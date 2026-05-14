@@ -11,10 +11,10 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { RoleModule } from "./modules/roles/role.module";
 import { MediaModule } from "./modules/media/media.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
+import { PackageModule } from "./modules/packages/package.module";
 import { BusinessModule } from "./modules/business/business.module";
 import { EmployeeModule } from "./modules/employees/employee.module";
 import { PermissionModule } from "./modules/permissions/permission.module";
-import { AdminPackageModule } from "./modules/admin-package/admin-package.module";
 
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.middleware";
@@ -31,7 +31,8 @@ import { RequestContextMiddleware } from "./common/request-context/request-conte
     AuthModule,
 
     TenantModule,
-    AdminPackageModule,
+
+    PackageModule,
 
     MediaModule,
     BusinessModule,

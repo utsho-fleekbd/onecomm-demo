@@ -28,6 +28,7 @@ import type { CurrentUserPayload } from "../auth/decorators/current-user.decorat
 import { CurrentBusiness } from "../business/decorators/current-business.decorator";
 import { SkipBusinessGuard } from "../business/decorators/skip-business-guard.decorator";
 import type { BusinessAccessContext } from "../../common/request-context/request-context.types";
+import { SubscriptionGuard } from "../packages/guards/subscription.guard";
 
 import { AddPermissionDto } from "./dto/add-permission";
 import { PermissionService } from "./permission.service";
@@ -38,7 +39,7 @@ import { apiResponse } from "../../common/utils/api-response.util";
 
 @ApiTags("Permissions")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, BusinessGuard, PermissionGuard)
 @Controller("permissions")
 export class PermissionController {
   constructor(private readonly permissionsService: PermissionService) {}

@@ -103,8 +103,7 @@ enum OrderRefundStatus {
 
 
 // ======================================================
-// CUSTOMER
-// table: order_customers
+// Models
 // ======================================================
 
 model OrderCustomer {
@@ -134,12 +133,6 @@ model OrderCustomer {
   @@map("order_customers")
 }
 
-
-// ======================================================
-// CUSTOMER ADDRESS
-// table: order_customer_addresses
-// ======================================================
-
 model OrderCustomerAddress {
   id          String           @id @default(uuid()) @db.Uuid
   customerId  String           @map("customer_id") @db.Uuid
@@ -163,12 +156,6 @@ model OrderCustomerAddress {
   @@map("order_customer_addresses")
 }
 
-
-// ======================================================
-// CART
-// table: order_carts
-// ======================================================
-
 model OrderCart {
   id         String          @id @default(uuid()) @db.Uuid
   businessId String          @map("business_id") @db.Uuid
@@ -191,12 +178,6 @@ model OrderCart {
   @@map("order_carts")
 }
 
-
-// ======================================================
-// CART ITEM
-// table: order_cart_items
-// ======================================================
-
 model OrderCartItem {
   id        String   @id @default(uuid()) @db.Uuid
   cartId    String   @map("cart_id") @db.Uuid
@@ -215,12 +196,6 @@ model OrderCartItem {
   @@index([variantId])
   @@map("order_cart_items")
 }
-
-
-// ======================================================
-// ORDER
-// table: order_orders
-// ======================================================
 
 model OrderOrder {
   id                      String             @id @default(uuid()) @db.Uuid
@@ -271,12 +246,6 @@ model OrderOrder {
   @@map("order_orders")
 }
 
-
-// ======================================================
-// ORDER ITEM
-// table: order_order_items
-// ======================================================
-
 model OrderOrderItem {
   id             String   @id @default(uuid()) @db.Uuid
   orderId        String   @map("order_id") @db.Uuid
@@ -301,12 +270,6 @@ model OrderOrderItem {
   @@map("order_order_items")
 }
 
-
-// ======================================================
-// ORDER STATUS LOG
-// table: order_status_logs
-// ======================================================
-
 model OrderStatusLog {
   id         String       @id @default(uuid()) @db.Uuid
   orderId    String       @map("order_id") @db.Uuid
@@ -326,12 +289,6 @@ model OrderStatusLog {
   @@map("order_status_logs")
 }
 
-
-// ======================================================
-// ORDER DISCOUNT
-// table: order_discounts
-// ======================================================
-
 model OrderDiscount {
   id             String              @id @default(uuid()) @db.Uuid
   orderId         String              @map("order_id") @db.Uuid
@@ -350,12 +307,6 @@ model OrderDiscount {
   @@index([code])
   @@map("order_discounts")
 }
-
-
-// ======================================================
-// ORDER PAYMENT
-// table: order_payments
-// ======================================================
 
 model OrderPayment {
   id                   String             @id @default(uuid()) @db.Uuid
@@ -384,12 +335,6 @@ model OrderPayment {
   @@index([paidAt])
   @@map("order_payments")
 }
-
-
-// ======================================================
-// ORDER RETURN
-// table: order_returns
-// ======================================================
 
 model OrderReturn {
   id          String            @id @default(uuid()) @db.Uuid
@@ -420,12 +365,6 @@ model OrderReturn {
   @@map("order_returns")
 }
 
-
-// ======================================================
-// ORDER RETURN ITEM
-// table: order_return_items
-// ======================================================
-
 model OrderReturnItem {
   id          String   @id @default(uuid()) @db.Uuid
   returnId    String   @map("return_id") @db.Uuid
@@ -450,12 +389,6 @@ model OrderReturnItem {
   @@index([variantId])
   @@map("order_return_items")
 }
-
-
-// ======================================================
-// ORDER REFUND
-// table: order_refunds
-// ======================================================
 
 model OrderRefund {
   id                   String            @id @default(uuid()) @db.Uuid

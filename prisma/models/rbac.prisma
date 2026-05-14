@@ -1,10 +1,12 @@
 // =======================
 // Enums
 // =======================
+
 enum RbacFeature {
+    MEDIA_MANAGEMENT
+    PACKAGE_MANAGEMENT
     BUSINESS_MANAGEMENT
     EMPLOYEE_MANAGEMENT
-    MEDIA_MANAGEMENT
     ROLE_PERMISSION_MANAGEMENT
 }
 
@@ -28,7 +30,7 @@ enum UserRoleMapStatus {
 }
 
 // =======================
-// Tables
+// Models
 // =======================
 
 model RbacRole {

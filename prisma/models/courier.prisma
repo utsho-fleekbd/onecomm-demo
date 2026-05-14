@@ -51,10 +51,8 @@ enum CourierSettlementStatus {
   CANCELLED
 }
 
-
 // ======================================================
-// COURIER
-// table: courier_couriers
+// Models
 // ======================================================
 
 model Courier {
@@ -78,12 +76,6 @@ model Courier {
   @@index([status])
   @@map("courier_couriers")
 }
-
-
-// ======================================================
-// COURIER CONFIG
-// table: courier_configs
-// ======================================================
 
 model CourierConfig {
   id         String              @id @default(uuid()) @db.Uuid
@@ -109,12 +101,6 @@ model CourierConfig {
   @@map("courier_configs")
 }
 
-
-// ======================================================
-// DELIVERY ZONE
-// table: courier_delivery_zones
-// ======================================================
-
 model CourierDeliveryZone {
   id          String                    @id @default(uuid()) @db.Uuid
   businessId  String                    @map("business_id") @db.Uuid
@@ -138,12 +124,6 @@ model CourierDeliveryZone {
   @@map("courier_delivery_zones")
 }
 
-
-// ======================================================
-// DELIVERY ZONE AREA
-// table: courier_delivery_zone_areas
-// ======================================================
-
 model CourierDeliveryZoneArea {
   id             String   @id @default(uuid()) @db.Uuid
   deliveryZoneId String   @map("delivery_zone_id") @db.Uuid
@@ -160,12 +140,6 @@ model CourierDeliveryZoneArea {
   @@index([city])
   @@map("courier_delivery_zone_areas")
 }
-
-
-// ======================================================
-// SHIPPING CHARGE
-// table: courier_shipping_charges
-// ======================================================
 
 model CourierShippingCharge {
   id              String                      @id @default(uuid()) @db.Uuid
@@ -191,12 +165,6 @@ model CourierShippingCharge {
   @@index([status])
   @@map("courier_shipping_charges")
 }
-
-
-// ======================================================
-// SHIPMENT
-// table: courier_shipments
-// ======================================================
 
 model CourierShipment {
   id                      String                @id @default(uuid()) @db.Uuid
@@ -245,12 +213,6 @@ model CourierShipment {
   @@map("courier_shipments")
 }
 
-
-// ======================================================
-// SHIPMENT ITEM
-// table: courier_shipment_items
-// ======================================================
-
 model CourierShipmentItem {
   id          String   @id @default(uuid()) @db.Uuid
   shipmentId  String   @map("shipment_id") @db.Uuid
@@ -271,12 +233,6 @@ model CourierShipmentItem {
   @@index([variantId])
   @@map("courier_shipment_items")
 }
-
-
-// ======================================================
-// COURIER RECEIVABLE
-// table: courier_receivables
-// ======================================================
 
 model CourierReceivable {
   id                     String                  @id @default(uuid()) @db.Uuid
@@ -309,12 +265,6 @@ model CourierReceivable {
   @@map("courier_receivables")
 }
 
-
-// ======================================================
-// COURIER SETTLEMENT
-// table: courier_settlements
-// ======================================================
-
 model CourierSettlement {
   id                    String                  @id @default(uuid()) @db.Uuid
   businessId             String                  @map("business_id") @db.Uuid
@@ -346,12 +296,6 @@ model CourierSettlement {
   @@index([status])
   @@map("courier_settlements")
 }
-
-
-// ======================================================
-// COURIER SETTLEMENT ITEM
-// table: courier_settlement_items
-// ======================================================
 
 model CourierSettlementItem {
   id                String   @id @default(uuid()) @db.Uuid

@@ -1,4 +1,4 @@
-import { PermissionAction, RbacFeature } from "@prisma/client";
+import { PackageLimitKey, PermissionAction, RbacFeature } from "@prisma/client";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   Body,
@@ -19,6 +19,9 @@ import { BusinessGuard } from "../business/guards/business.guard";
 import { PermissionGuard } from "../permissions/guards/permission.guard";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
+import { PackageLimitGuard } from "../packages/guards/package-limit.guard";
+import { RequirePackageLimit } from "../packages/decorators/require-package-limit.decorator";
+import { SubscriptionGuard } from "../packages/guards/subscription.guard";
 
 import { AssignRoleDto } from "./dto/assign-role.dto";
 import { CreateRoleDto } from "./dto/create-role.dto";
@@ -30,7 +33,13 @@ import { RoleService } from "./role.service";
 
 @ApiTags("Roles")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SubscriptionGuard,
+  BusinessGuard,
+  PermissionGuard,
+  PackageLimitGuard,
+)
 @Controller("roles")
 export class RoleController {
   constructor(private readonly rolesService: RoleService) {}
@@ -39,6 +48,7 @@ export class RoleController {
     RbacFeature.ROLE_PERMISSION_MANAGEMENT,
     PermissionAction.CREATE,
   )
+  @RequirePackageLimit(PackageLimitKey.MAX_ROLES)
   @Post("businesses/:businessId")
   @ApiOperation({
     summary: "Create a role for a business",

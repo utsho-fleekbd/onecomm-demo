@@ -26,6 +26,7 @@ import { SelectBusinessDto } from "./dto/select-business.dto";
 import { BusinessService } from "../business/business.service";
 import { apiResponse } from "../../common/utils/api-response.util";
 import type { CurrentUserPayload } from "./decorators/current-user.decorator";
+import { PackageSubscriptionService } from "../packages/package-subscription.service";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -50,6 +51,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly businessService: BusinessService,
+    private readonly packageSubscriptions: PackageSubscriptionService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -101,6 +103,8 @@ export class AuthService {
       );
       const selectedBusiness = selectedBusinessResponse.data;
 
+      await this.packageSubscriptions.assignDefaultTrial(user.id, tx);
+
       return apiResponse({
         user,
         selectedBusiness,
@@ -129,6 +133,7 @@ export class AuthService {
     }
 
     this.assertActiveUser(user);
+    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
 
     const safeUser = this.toSafeUser(user);
 
@@ -208,6 +213,7 @@ export class AuthService {
     const user = session.user;
 
     this.assertActiveUser(user);
+    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
 
     const requestedBusinessId = dto.businessId ?? session.businessId;
 
@@ -277,6 +283,7 @@ export class AuthService {
     }
 
     this.assertActiveUser(user);
+    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
 
     const business = await this.findAccessibleBusiness(userId, dto.businessId);
 
@@ -304,6 +311,8 @@ export class AuthService {
   }
 
   async me(user: CurrentUserPayload) {
+    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
+
     if (user.type === SystemUserType.ADMIN) {
       return apiResponse({
         user,

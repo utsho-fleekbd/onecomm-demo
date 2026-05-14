@@ -7,6 +7,7 @@ import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { BusinessModule } from "../business/business.module";
+import { PackageModule } from "../packages/package.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { BusinessModule } from "../business/business.module";
       defaultStrategy: "jwt",
     }),
     BusinessModule,
+    PackageModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {

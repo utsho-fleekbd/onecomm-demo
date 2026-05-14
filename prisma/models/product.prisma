@@ -21,7 +21,7 @@ enum ProductVariantStatus {
 
 
 // =======================
-// Category / Brand / Unit / Tag
+// Models
 // =======================
 
 model ProductCategory {
@@ -112,11 +112,6 @@ model ProductTag {
   @@map("product_tags")
 }
 
-
-// =======================
-// Product / Variant
-// =======================
-
 model Product {
   id          String               @id @default(uuid()) @db.Uuid
   businessId  String               @map("business_id") @db.Uuid
@@ -187,11 +182,6 @@ model ProductVariant {
   @@map("product_variants")
 }
 
-
-// =======================
-// Attributes
-// =======================
-
 model ProductAttribute {
   id        String              @id @default(uuid()) @db.Uuid
   productId String              @map("product_id") @db.Uuid
@@ -247,11 +237,6 @@ model ProductVariantAttribute {
   @@index([attributeValueId])
   @@map("product_variant_attributes")
 }
-
-
-// =======================
-// Images / Tags Mapping
-// =======================
 
 model ProductImage {
   id          String          @id @default(uuid()) @db.Uuid

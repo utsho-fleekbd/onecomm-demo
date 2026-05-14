@@ -8,6 +8,7 @@ import {
   MediaAssetStatus,
   MediaFileType,
   MediaTagStatus,
+  PackageLimitKey,
   Prisma,
 } from "@prisma/client";
 
@@ -29,6 +30,7 @@ import type {
   MediaUploader,
   UploadableMediaFile,
 } from "./uploaders/media-uploader.types";
+import { PackageLimitService } from "../packages/package-limit.service";
 
 const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/gif",
@@ -58,6 +60,7 @@ export class MediaService {
     private readonly uploader: MediaUploader,
     @Inject(MEDIA_LIMITS)
     private readonly limits: MediaLimits,
+    private readonly packageLimits: PackageLimitService,
   ) {}
 
   async uploadImage(
@@ -67,6 +70,10 @@ export class MediaService {
     dto: UploadMediaDto,
   ) {
     this.assertValidImage(file);
+    await this.packageLimits.assertWithinLimit(
+      currentUser,
+      PackageLimitKey.MAX_MEDIAS,
+    );
 
     const tags = this.normalizeTags(dto.tags);
     const uploadedFile = await this.uploader.upload(file, {
@@ -99,6 +106,12 @@ export class MediaService {
         `You can upload up to ${this.limits.maxBulkImageFiles} images at once`,
       );
     }
+
+    await this.packageLimits.assertWithinLimit(
+      currentUser,
+      PackageLimitKey.MAX_MEDIAS,
+      files.length,
+    );
 
     for (const file of files) {
       this.assertValidImage(file);
