@@ -19,6 +19,22 @@ export class MailService {
     });
   }
 
+  async sendForgotPasswordOtpEmail(to: string, otp: string) {
+    await this.transporter.sendMail({
+      from: this.configService.getOrThrow<string>("MAIL_FROM"),
+      to,
+      subject: "Reset your password",
+      html: `
+      <div>
+        <h2>Reset your password</h2>
+        <p>Your password reset OTP is:</p>
+        <h1>${otp}</h1>
+        <p>This OTP will expire in 10 minutes.</p>
+      </div>
+    `,
+    });
+  }
+
   async sendRegisterOtpEmail(to: string, otp: string) {
     await this.transporter.sendMail({
       from: this.configService.getOrThrow<string>("MAIL_FROM"),

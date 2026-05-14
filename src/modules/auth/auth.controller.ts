@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { LoginDto } from "./dto/login.dto";
@@ -13,11 +21,14 @@ import type { CurrentUserPayload } from "./decorators/current-user.decorator";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { VerifyRegisterDto } from "./dto/verify-register.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { VerifyResetOtpDto } from "./dto/verify-reset-otp.dto";
+import { ResetForgotPasswordDto } from "./dto/reset-forgot-password.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post("register")
   @ApiOperation({ summary: "Register admin and create first business" })
@@ -40,6 +51,24 @@ export class AuthController {
   @ApiOperation({ summary: "Login user" })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post("forgot-password")
+  @ApiOperation({ summary: "Send otp for forget password" })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post("forgot-password/verify-otp")
+  @ApiOperation({ summary: "Verify for forget password" })
+  verifyResetOtp(@Body() dto: VerifyResetOtpDto) {
+    return this.authService.verifyResetOtp(dto);
+  }
+
+  @Post("forgot-password/reset")
+  @ApiOperation({ summary: "Reset forget password" })
+  resetForgotPassword(@Body() dto: ResetForgotPasswordDto) {
+    return this.authService.resetForgotPassword(dto);
   }
 
   @Post("reset")

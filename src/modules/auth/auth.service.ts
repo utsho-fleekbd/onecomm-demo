@@ -33,6 +33,9 @@ import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { MailService } from "../mail/mail.service";
 import { VerifyRegisterDto } from "./dto/verify-register.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { VerifyResetOtpDto } from "./dto/verify-reset-otp.dto";
+import { ResetForgotPasswordDto } from "./dto/reset-forgot-password.dto";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -58,7 +61,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly businessService: BusinessService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   async register(dto: RegisterDto) {
     const email = this.normalizeEmail(dto.email);
@@ -399,6 +402,231 @@ export class AuthService {
     });
   }
 
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = this.normalizeEmail(dto.email);
+
+    const user = await this.prisma.systemUser.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    this.assertActiveUser(user);
+
+    const otp = this.generateOtp();
+    const otpHash = await this.hashPassword(otp);
+    const expiresAt = this.getOtpExpiresAt();
+
+    await this.prisma.systemPasswordReset.create({
+      data: {
+        userId: user.id,
+        otpHash,
+        expiresAt,
+      },
+    });
+
+    await this.mailService.sendForgotPasswordOtpEmail(email, otp);
+
+    return apiResponse(
+      { success: true },
+      "Password reset OTP sent successfully",
+    );
+  }
+
+  async verifyResetOtp(dto: VerifyResetOtpDto) {
+    const email = this.normalizeEmail(dto.email);
+
+    const user = await this.prisma.systemUser.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException("Invalid email or OTP");
+    }
+
+    this.assertActiveUser(user);
+
+    const resetRecord = await this.prisma.systemPasswordReset.findFirst({
+      where: {
+        userId: user.id,
+        usedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!resetRecord) {
+      throw new BadRequestException("OTP is invalid or expired");
+    }
+
+    if (resetRecord.attemptCount >= 5) {
+      throw new BadRequestException(
+        "Too many attempts. Please request a new OTP",
+      );
+    }
+
+    const isOtpMatched = await this.verifyPassword(
+      resetRecord.otpHash,
+      dto.otp,
+    );
+
+    if (!isOtpMatched) {
+      await this.prisma.systemPasswordReset.update({
+        where: {
+          id: resetRecord.id,
+        },
+        data: {
+          attemptCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      throw new BadRequestException("Invalid OTP");
+    }
+
+    const verification = await this.prisma.systemEmailVerification.create({
+      data: {
+        userId: user.id,
+        otpHash: resetRecord.otpHash,
+        purpose: OtpPurpose.PASSWORD_RESET,
+        expiresAt: resetRecord.expiresAt,
+        verifiedAt: new Date(),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return apiResponse(
+      {
+        verificationId: verification.id,
+      },
+      "OTP verified successfully",
+    );
+  }
+
+  async resetForgotPassword(dto: ResetForgotPasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException(
+        "New password and confirm password do not match",
+      );
+    }
+
+    const email = this.normalizeEmail(dto.email);
+
+    const user = await this.prisma.systemUser.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        passwordHash: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException("Invalid reset request");
+    }
+
+    this.assertActiveUser(user);
+
+    const verification = await this.prisma.systemEmailVerification.findFirst({
+      where: {
+        id: dto.verificationId,
+        userId: user.id,
+        purpose: OtpPurpose.PASSWORD_RESET,
+        verifiedAt: {
+          not: null,
+        },
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!verification) {
+      throw new BadRequestException("OTP verification is invalid or expired");
+    }
+
+    const resetRecord = await this.prisma.systemPasswordReset.findFirst({
+      where: {
+        userId: user.id,
+        otpHash: verification.otpHash,
+        usedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!resetRecord) {
+      throw new BadRequestException("Reset request is invalid or expired");
+    }
+
+    const isSamePassword = await this.verifyPassword(
+      user.passwordHash,
+      dto.newPassword,
+    );
+
+    if (isSamePassword) {
+      throw new BadRequestException(
+        "New password must be different from old password",
+      );
+    }
+
+    const passwordHash = await this.hashPassword(dto.newPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.systemUser.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          passwordHash,
+        },
+      }),
+
+      this.prisma.systemPasswordReset.update({
+        where: {
+          id: resetRecord.id,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      }),
+
+      this.prisma.systemSession.updateMany({
+        where: {
+          userId: user.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return apiResponse({ success: true }, "Password reset successfully");
+  }
+
   async resetPassword(user: CurrentUserPayload, dto: ResetPasswordDto) {
     if (dto.newPassword !== dto.confirmPassword) {
       throw new BadRequestException(
@@ -684,6 +912,25 @@ export class AuthService {
       }
     }
 
+    const profileData = dto.profile
+      ? {
+          upsert: {
+            create: {
+              ...dto.profile,
+              dateOfBirth: dto.profile.dateOfBirth
+                ? new Date(dto.profile.dateOfBirth)
+                : undefined,
+            },
+            update: {
+              ...dto.profile,
+              dateOfBirth: dto.profile.dateOfBirth
+                ? new Date(dto.profile.dateOfBirth)
+                : undefined,
+            },
+          },
+        }
+      : undefined;
+
     const updatedUser = await this.prisma.systemUser.update({
       where: {
         id: userId,
@@ -691,25 +938,7 @@ export class AuthService {
       data: {
         name: dto.name,
         phone: dto.phone,
-
-        profile: dto.profile
-          ? {
-            upsert: {
-              create: {
-                ...dto.profile,
-                dateOfBirth: dto.profile.dateOfBirth
-                  ? new Date(dto.profile.dateOfBirth)
-                  : undefined,
-              },
-              update: {
-                ...dto.profile,
-                dateOfBirth: dto.profile.dateOfBirth
-                  ? new Date(dto.profile.dateOfBirth)
-                  : undefined,
-              },
-            },
-          }
-          : undefined,
+        profile: profileData,
       },
       select: {
         id: true,
@@ -969,7 +1198,7 @@ export class AuthService {
   }
 
   private toSafeUser(user: SystemUser): SafeSystemUser {
-    const { passwordHash, ...safeUser } = user;
+    const { ...safeUser } = user;
     return safeUser;
   }
 
