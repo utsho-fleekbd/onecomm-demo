@@ -24,6 +24,8 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { VerifyResetOtpDto } from "./dto/verify-reset-otp.dto";
 import { ResetForgotPasswordDto } from "./dto/reset-forgot-password.dto";
+import { RequestChangeEmailDto } from "./dto/request-change-email.dto";
+import { VerifyChangeEmailDto } from "./dto/verify-change-email.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -37,6 +39,7 @@ export class AuthController {
   }
 
   @Post("register/verify")
+  @ApiOperation({ summary: "Register verification" })
   verifyRegister(@Body() dto: VerifyRegisterDto) {
     return this.authService.verifyRegister(dto);
   }
@@ -51,6 +54,28 @@ export class AuthController {
   @ApiOperation({ summary: "Login user" })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post("change-email/request")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Send otp for email change" })
+  requestChangeEmail(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: RequestChangeEmailDto,
+  ) {
+    return this.authService.requestChangeEmail(user.id, dto);
+  }
+
+  @Post("change-email/verify")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Verify email for email change" })
+  verifyChangeEmail(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: VerifyChangeEmailDto,
+  ) {
+    return this.authService.verifyChangeEmail(user.id, dto);
   }
 
   @Post("forgot-password")

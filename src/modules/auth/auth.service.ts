@@ -36,6 +36,8 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { VerifyResetOtpDto } from "./dto/verify-reset-otp.dto";
 import { ResetForgotPasswordDto } from "./dto/reset-forgot-password.dto";
+import { RequestChangeEmailDto } from "./dto/request-change-email.dto";
+import { VerifyChangeEmailDto } from "./dto/verify-change-email.dto";
 
 type SafeSystemUser = Omit<SystemUser, "passwordHash">;
 
@@ -402,6 +404,179 @@ export class AuthService {
     });
   }
 
+  async requestChangeEmail(userId: string, dto: RequestChangeEmailDto) {
+    const newEmail = this.normalizeEmail(dto.newEmail);
+
+    const user = await this.prisma.systemUser.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    if (user.email === newEmail) {
+      throw new BadRequestException("New email must be different");
+    }
+
+    const existingUser = await this.prisma.systemUser.findFirst({
+      where: {
+        email: newEmail,
+        id: {
+          not: userId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingUser) {
+      throw new ConflictException("Email already exists");
+    }
+
+    const otp = this.generateOtp();
+    const otpHash = await this.hashPassword(otp);
+    const expiresAt = this.getOtpExpiresAt();
+
+    const verification = await this.prisma.systemEmailVerification.create({
+      data: {
+        userId,
+        otpHash,
+        purpose: OtpPurpose.EMAIL_CHANGE,
+        expiresAt,
+      },
+      select: {
+        id: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
+
+    await this.mailService.sendChangeEmailOtpEmail(newEmail, otp);
+
+    return apiResponse(
+      {
+        verificationId: verification.id,
+        email: newEmail,
+        expiresAt: verification.expiresAt,
+      },
+      "OTP sent to new email successfully",
+    );
+  }
+
+  async verifyChangeEmail(userId: string, dto: VerifyChangeEmailDto) {
+    const newEmail = this.normalizeEmail(dto.email);
+
+    const user = await this.prisma.systemUser.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    if (user.email === newEmail) {
+      throw new BadRequestException("New email must be different");
+    }
+
+    const existingUser = await this.prisma.systemUser.findFirst({
+      where: {
+        email: newEmail,
+        id: {
+          not: userId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingUser) {
+      throw new ConflictException("Email already exists");
+    }
+
+    const verification = await this.prisma.systemEmailVerification.findFirst({
+      where: {
+        userId,
+        purpose: OtpPurpose.EMAIL_CHANGE,
+        verifiedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        id: true,
+        otpHash: true,
+        expiresAt: true,
+        attemptCount: true,
+        createdAt: true,
+      },
+    });
+
+    if (!verification) {
+      throw new BadRequestException("Invalid or expired OTP");
+    }
+
+    const isOtpValid = await this.verifyPassword(verification.otpHash, dto.otp);
+
+    if (!isOtpValid) {
+      throw new BadRequestException("Invalid OTP");
+    }
+
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.systemUser.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          email: newEmail,
+          emailVerifiedAt: new Date(),
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          type: true,
+          status: true,
+          emailVerifiedAt: true,
+          profile: true,
+        },
+      });
+
+      await tx.systemEmailVerification.update({
+        where: {
+          id: verification.id,
+        },
+        data: {
+          verifiedAt: new Date(),
+        },
+      });
+
+      return updated;
+    });
+
+    return apiResponse(updatedUser, "Email updated successfully");
+  }
+
   async forgotPassword(dto: ForgotPasswordDto) {
     const email = this.normalizeEmail(dto.email);
 
@@ -628,12 +803,6 @@ export class AuthService {
   }
 
   async resetPassword(user: CurrentUserPayload, dto: ResetPasswordDto) {
-    if (dto.newPassword !== dto.confirmPassword) {
-      throw new BadRequestException(
-        "New password and confirm password do not match",
-      );
-    }
-
     if (dto.oldPassword === dto.newPassword) {
       throw new BadRequestException(
         "New password must be different from old password",
@@ -668,41 +837,21 @@ export class AuthService {
 
     const newPasswordHash = await this.hashPassword(dto.newPassword);
 
-    const resetToken = "123456";
-
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
-    await this.prisma.$transaction(async (tx) => {
-      const passwordReset = await tx.systemPasswordReset.create({
-        data: {
-          userId: existingUser.id,
-          otpHash: resetToken,
-          expiresAt,
-          usedAt: new Date(),
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      await tx.systemUser.update({
-        where: {
-          id: existingUser.id,
-        },
-        data: {
-          passwordHash: newPasswordHash,
-        },
-      });
-
-      console.log("passwordReset", passwordReset);
-
-      return passwordReset;
+    const result = await this.prisma.systemUser.update({
+      where: {
+        id: existingUser.id,
+      },
+      data: {
+        passwordHash: newPasswordHash,
+      },
     });
 
     console.log("password", isOldPasswordMatched);
 
-    return "reset";
+    return apiResponse(result, "password successful");
   }
 
   async refresh(dto: RefreshTokenDto) {
@@ -887,6 +1036,7 @@ export class AuthService {
       },
       select: {
         id: true,
+        profile: true,
       },
     });
 
@@ -898,6 +1048,7 @@ export class AuthService {
       const phoneExists = await this.prisma.systemUser.findFirst({
         where: {
           phone: dto.phone,
+          deletedAt: null,
           id: {
             not: userId,
           },
@@ -912,22 +1063,16 @@ export class AuthService {
       }
     }
 
-    const profileData = dto.profile
+    if (dto.profile && !user.profile) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    const profilePayload = dto.profile
       ? {
-          upsert: {
-            create: {
-              ...dto.profile,
-              dateOfBirth: dto.profile.dateOfBirth
-                ? new Date(dto.profile.dateOfBirth)
-                : undefined,
-            },
-            update: {
-              ...dto.profile,
-              dateOfBirth: dto.profile.dateOfBirth
-                ? new Date(dto.profile.dateOfBirth)
-                : undefined,
-            },
-          },
+          ...dto.profile,
+          dateOfBirth: dto.profile.dateOfBirth
+            ? new Date(dto.profile.dateOfBirth)
+            : undefined,
         }
       : undefined;
 
@@ -938,7 +1083,12 @@ export class AuthService {
       data: {
         name: dto.name,
         phone: dto.phone,
-        profile: profileData,
+
+        profile: profilePayload
+          ? {
+              update: profilePayload,
+            }
+          : undefined,
       },
       select: {
         id: true,

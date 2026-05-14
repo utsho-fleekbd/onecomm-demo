@@ -35,6 +35,22 @@ export class MailService {
     });
   }
 
+  async sendChangeEmailOtpEmail(to: string, otp: string) {
+    await this.transporter.sendMail({
+      from: this.configService.getOrThrow<string>("MAIL_FROM"),
+      to,
+      subject: "Confirm your new email",
+      html: `
+      <div>
+        <h2>Confirm your new email</h2>
+        <p>Your email change verification code is:</p>
+        <h1>${otp}</h1>
+        <p>This code will expire in 10 minutes.</p>
+      </div>
+    `,
+    });
+  }
+
   async sendRegisterOtpEmail(to: string, otp: string) {
     await this.transporter.sendMail({
       from: this.configService.getOrThrow<string>("MAIL_FROM"),

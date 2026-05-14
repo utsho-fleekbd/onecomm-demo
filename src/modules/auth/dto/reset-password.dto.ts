@@ -11,9 +11,4 @@ export class ResetPasswordDto {
   @IsString()
   @MinLength(6)
   declare newPassword: string;
-
-  @ApiProperty({ example: "NewPassword@123" })
-  @IsString()
-  @MinLength(6)
-  declare confirmPassword: string;
 }
