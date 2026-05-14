@@ -33,10 +33,11 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import type { UploadableMediaFile } from "./uploaders/media-uploader.types";
+import { SubscriptionGuard } from "../packages/guards/subscription.guard";
 
 @ApiTags("Media")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard, BusinessGuard, PermissionGuard)
 @Controller("media/businesses/:businessId")
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}

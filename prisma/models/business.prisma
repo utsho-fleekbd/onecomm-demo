@@ -46,13 +46,14 @@ model Business {
     branding  BusinessBranding?
     members   BusinessMember[]
     roles     RbacRole[]
+    mediaAssets MediaAsset[]
     auditLogs SystemAuditLog[]
 
     @@unique([slug, ownerUserId])
     @@index([ownerUserId])
     @@index([status])
     @@index([deletedAt])
-    @@map("business_businesses")
+    @@map("businesses")
 }
 
 model BusinessSetting {
@@ -91,7 +92,7 @@ model BusinessBranding {
 
     business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-    @@map("business_branding")
+    @@map("business_brandings")
 }
 
 model BusinessMember {
@@ -105,8 +106,8 @@ model BusinessMember {
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
     deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-    business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-    user     SystemUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    business Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+    user     SystemUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([businessId, userId])
     @@index([businessId])

@@ -6,7 +6,7 @@ enum PackageBillingCycle {
   FREE
   MONTHLY
   YEARLY
-  ONE_TIME
+  LIFETIME
 }
 
 enum PackageStatus {
@@ -20,6 +20,13 @@ enum PackageResetCycle {
   DAILY
   MONTHLY
   YEARLY
+}
+
+enum PackageLimitKey {
+  MAX_ROLES       @map("max_roles")
+  MAX_MEDIAS      @map("max_medias")
+  MAX_EMPLOYEES   @map("max_employees")
+  MAX_BUSINESSES  @map("max_businesses")
 }
 
 enum PackageSubscriptionStatus {
@@ -36,6 +43,18 @@ enum PackageSubscriptionAddonStatus {
   EXPIRED
 }
 
+enum PackagePaymentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PackagePaymentType {
+  PLAN_CHANGE
+  ADDON_PURCHASE
+}
+
 // =======================
 // Models
 // =======================
@@ -48,6 +67,7 @@ model PackagePlan {
   billingCycle  PackageBillingCycle @map("billing_cycle")
   currencyCode  String              @default("BDT") @map("currency_code") @db.VarChar(10)
   freeTrialDays Int                 @default(0) @map("free_trial_days")
+  isDefault     Boolean             @default(false) @map("is_default")
   status        PackageStatus       @default(ACTIVE)
   sortOrder     Int                 @default(0) @map("sort_order")
   createdAt     DateTime            @default(now()) @map("created_at")
@@ -56,17 +76,18 @@ model PackagePlan {
 
   limits        PackagePlanLimit[]
   subscriptions PackageSubscription[]
+  mockPayments  PackageMockPayment[]
 
   @@unique([name])
+  @@index([isDefault])
   @@index([status])
   @@map("package_plans")
 }
 
-
 model PackagePlanLimit {
   id          String            @id @default(uuid()) @db.Uuid
   packageId   String            @map("package_id") @db.Uuid
-  limitKey    String            @map("limit_key") @db.VarChar(100)
+  limitKey    PackageLimitKey   @map("limit_key")
   limitValue  Int               @map("limit_value")
   resetCycle  PackageResetCycle @default(LIFETIME) @map("reset_cycle")
   description String?
@@ -87,6 +108,11 @@ model PackageAddon {
   price         Decimal             @default(0) @db.Decimal(12, 2)
   billingCycle  PackageBillingCycle @map("billing_cycle")
   currencyCode  String              @default("BDT") @map("currency_code") @db.VarChar(10)
+
+  limitKey      PackageLimitKey     @map("limit_key")
+  limitValue    Int                 @map("limit_value")
+  resetCycle    PackageResetCycle   @default(LIFETIME) @map("reset_cycle")
+
   status        PackageStatus       @default(ACTIVE)
   sortOrder     Int                 @default(0) @map("sort_order")
   createdBy     String?             @map("created_by") @db.Uuid
@@ -95,28 +121,13 @@ model PackageAddon {
   updatedAt     DateTime            @updatedAt @map("updated_at")
   deletedAt     DateTime?           @map("deleted_at")
 
-  limits        PackageAddonLimit[]
   subscriptions PackageSubscriptionAddon[]
+  mockPayments  PackageMockPayment[]
 
   @@unique([name])
+  @@index([limitKey])
   @@index([status])
   @@map("package_addons")
-}
-
-model PackageAddonLimit {
-  id         String            @id @default(uuid()) @db.Uuid
-  addonId    String            @map("addon_id") @db.Uuid
-  limitKey   String            @map("limit_key") @db.VarChar(100)
-  limitValue Int               @map("limit_value")
-  resetCycle PackageResetCycle @default(LIFETIME) @map("reset_cycle")
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
-
-  addon      PackageAddon      @relation(fields: [addonId], references: [id], onDelete: Cascade)
-
-  @@unique([addonId, limitKey])
-  @@index([limitKey])
-  @@map("package_addon_limits")
 }
 
 model PackageSubscription {
@@ -138,8 +149,10 @@ model PackageSubscription {
   updatedAt          DateTime                  @updatedAt @map("updated_at")
 
   package            PackagePlan               @relation(fields: [packageId], references: [id])
+  tenant             SystemUser                @relation("TenantPackageSubscriptions", fields: [tenantId], references: [id], onDelete: Cascade)
   addons             PackageSubscriptionAddon[]
   usageCounters      PackageUsageCounter[]
+  mockPayments       PackageMockPayment[]
 
   @@index([tenantId])
   @@index([packageId])
@@ -171,7 +184,7 @@ model PackageSubscriptionAddon {
 model PackageUsageCounter {
   id             String              @id @default(uuid()) @db.Uuid
   subscriptionId String              @map("subscription_id") @db.Uuid
-  limitKey       String              @map("limit_key") @db.VarChar(100)
+  limitKey       PackageLimitKey     @map("limit_key")
   usedValue      Int                 @default(0) @map("used_value")
   periodStart    DateTime            @map("period_start")
   periodEnd      DateTime            @map("period_end")
@@ -184,4 +197,35 @@ model PackageUsageCounter {
   @@index([limitKey])
   @@index([periodStart, periodEnd])
   @@map("package_usage_counters")
+}
+
+model PackageMockPayment {
+  id             String               @id @default(uuid()) @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  subscriptionId String?              @map("subscription_id") @db.Uuid
+  planId         String?              @map("plan_id") @db.Uuid
+  addonId        String?              @map("addon_id") @db.Uuid
+  type           PackagePaymentType
+  status         PackagePaymentStatus @default(PENDING)
+  amount         Decimal              @default(0) @db.Decimal(12, 2)
+  currencyCode   String               @default("BDT") @map("currency_code") @db.VarChar(10)
+  quantity       Int                  @default(1)
+  metadata       Json?
+  expiresAt      DateTime             @map("expires_at")
+  confirmedAt    DateTime?            @map("confirmed_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  tenant         SystemUser           @relation("TenantPackageMockPayments", fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription   PackageSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  plan           PackagePlan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
+  addon          PackageAddon?        @relation(fields: [addonId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([subscriptionId])
+  @@index([planId])
+  @@index([addonId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("package_mock_payments")
 }

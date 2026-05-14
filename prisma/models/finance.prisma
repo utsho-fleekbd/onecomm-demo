@@ -71,10 +71,8 @@ enum FinanceJournalLineType {
   CREDIT
 }
 
-
 // ======================================================
-// FINANCE ACCOUNT
-// table: finance_accounts
+// Models
 // ======================================================
 
 model FinanceAccount {
@@ -108,12 +106,6 @@ model FinanceAccount {
   @@map("finance_accounts")
 }
 
-
-// ======================================================
-// ACCOUNT TRANSACTION
-// table: finance_account_transactions
-// ======================================================
-
 model FinanceAccountTransaction {
   id              String                 @id @default(uuid()) @db.Uuid
   businessId       String                 @map("business_id") @db.Uuid
@@ -144,12 +136,6 @@ model FinanceAccountTransaction {
   @@map("finance_account_transactions")
 }
 
-
-// ======================================================
-// EXPENSE CATEGORY
-// table: finance_expense_categories
-// ======================================================
-
 model FinanceExpenseCategory {
   id          String                       @id @default(uuid()) @db.Uuid
   businessId  String                       @map("business_id") @db.Uuid
@@ -169,12 +155,6 @@ model FinanceExpenseCategory {
   @@index([status])
   @@map("finance_expense_categories")
 }
-
-
-// ======================================================
-// EXPENSE
-// table: finance_expenses
-// ======================================================
 
 model FinanceExpense {
   id                String               @id @default(uuid()) @db.Uuid
@@ -208,12 +188,6 @@ model FinanceExpense {
   @@map("finance_expenses")
 }
 
-
-// ======================================================
-// RECEIVABLE
-// table: finance_receivables
-// ======================================================
-
 model FinanceReceivable {
   id             String                  @id @default(uuid()) @db.Uuid
   businessId      String                  @map("business_id") @db.Uuid
@@ -243,12 +217,6 @@ model FinanceReceivable {
   @@index([dueDate])
   @@map("finance_receivables")
 }
-
-
-// ======================================================
-// PAYABLE
-// table: finance_payables
-// ======================================================
 
 model FinancePayable {
   id          String               @id @default(uuid()) @db.Uuid
@@ -280,12 +248,6 @@ model FinancePayable {
   @@map("finance_payables")
 }
 
-
-// ======================================================
-// JOURNAL ENTRY
-// table: finance_journal_entries
-// ======================================================
-
 model FinanceJournalEntry {
   id            String             @id @default(uuid()) @db.Uuid
   businessId     String             @map("business_id") @db.Uuid
@@ -309,12 +271,6 @@ model FinanceJournalEntry {
   @@index([referenceType, referenceId])
   @@map("finance_journal_entries")
 }
-
-
-// ======================================================
-// JOURNAL ENTRY LINE
-// table: finance_journal_entry_lines
-// ======================================================
 
 model FinanceJournalEntryLine {
   id             String                 @id @default(uuid()) @db.Uuid

@@ -60,10 +60,8 @@ enum WebsiteComponentStatus {
   INACTIVE
 }
 
-
 // ======================================================
-// WEBSITE TEMPLATE
-// table: website_templates
+// Models
 // ======================================================
 
 model WebsiteTemplate {
@@ -91,12 +89,6 @@ model WebsiteTemplate {
   @@index([status])
   @@map("website_templates")
 }
-
-
-// ======================================================
-// WEBSITE
-// table: website_websites
-// ======================================================
 
 model Website {
   id               String                @id @default(uuid()) @db.Uuid
@@ -131,12 +123,6 @@ model Website {
   @@map("website_websites")
 }
 
-
-// ======================================================
-// WEBSITE CONFIG
-// table: website_configs
-// ======================================================
-
 model WebsiteConfig {
   id               String   @id @default(uuid()) @db.Uuid
   websiteId         String   @unique @map("website_id") @db.Uuid
@@ -153,12 +139,6 @@ model WebsiteConfig {
 
   @@map("website_configs")
 }
-
-
-// ======================================================
-// WEBSITE DOMAIN
-// table: website_domains
-// ======================================================
 
 model WebsiteDomain {
   id                 String                          @id @default(uuid()) @db.Uuid
@@ -185,12 +165,6 @@ model WebsiteDomain {
   @@index([verificationStatus])
   @@map("website_domains")
 }
-
-
-// ======================================================
-// WEBSITE PAGE
-// table: website_pages
-// ======================================================
 
 model WebsitePage {
   id          String            @id @default(uuid()) @db.Uuid
@@ -219,12 +193,6 @@ model WebsitePage {
   @@map("website_pages")
 }
 
-
-// ======================================================
-// WEBSITE PAGE SECTION
-// table: website_page_sections
-// ======================================================
-
 model WebsitePageSection {
   id            String               @id @default(uuid()) @db.Uuid
   pageId         String               @map("page_id") @db.Uuid
@@ -251,12 +219,6 @@ model WebsitePageSection {
   @@map("website_page_sections")
 }
 
-
-// ======================================================
-// WEBSITE COMPONENT
-// table: website_components
-// ======================================================
-
 model WebsiteComponent {
   id              String                 @id @default(uuid()) @db.Uuid
 
@@ -279,12 +241,6 @@ model WebsiteComponent {
   @@map("website_components")
 }
 
-
-// ======================================================
-// WEBSITE THEME SETTINGS
-// table: website_theme_settings
-// ======================================================
-
 model WebsiteThemeSetting {
   id             String   @id @default(uuid()) @db.Uuid
   websiteId       String   @unique @map("website_id") @db.Uuid
@@ -304,12 +260,6 @@ model WebsiteThemeSetting {
 
   @@map("website_theme_settings")
 }
-
-
-// ======================================================
-// WEBSITE SEO SETTINGS
-// table: website_seo_settings
-// ======================================================
 
 model WebsiteSeoSetting {
   id              String       @id @default(uuid()) @db.Uuid
@@ -333,12 +283,6 @@ model WebsiteSeoSetting {
   @@index([websiteId])
   @@map("website_seo_settings")
 }
-
-
-// ======================================================
-// WEBSITE PUBLISH VERSION
-// table: website_publish_versions
-// ======================================================
 
 model WebsitePublishVersion {
   id                String    @id @default(uuid()) @db.Uuid

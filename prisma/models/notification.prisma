@@ -1,9 +1,4 @@
 // ======================================================
-// NOTIFICATION MODULE
-// ======================================================
-
-
-// ======================================================
 // ENUMS
 // ======================================================
 
@@ -41,10 +36,8 @@ enum NotificationType {
   CUSTOM
 }
 
-
 // ======================================================
-// NOTIFICATION TEMPLATE
-// table: notification_templates
+// Models
 // ======================================================
 
 model NotificationTemplate {
@@ -77,12 +70,6 @@ model NotificationTemplate {
   @@index([status])
   @@map("notification_templates")
 }
-
-
-// ======================================================
-// NOTIFICATION
-// table: notifications
-// ======================================================
 
 model Notification {
   id               String                    @id @default(uuid()) @db.Uuid

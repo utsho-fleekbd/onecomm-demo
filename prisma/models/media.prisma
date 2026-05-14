@@ -20,10 +20,8 @@ enum MediaTagStatus {
   INACTIVE
 }
 
-
 // ======================================================
-// MEDIA ASSET
-// table: media_assets
+// Models
 // ======================================================
 
 model MediaAsset {
@@ -44,6 +42,7 @@ model MediaAsset {
   deletedAt  DateTime?        @map("deleted_at")
 
   tags       MediaAssetTag[]
+  business   Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
   @@index([uploadedBy])
@@ -51,12 +50,6 @@ model MediaAsset {
   @@index([status])
   @@map("media_assets")
 }
-
-
-// ======================================================
-// MEDIA TAG
-// table: media_tags
-// ======================================================
 
 model MediaTag {
   id         String         @id @default(uuid()) @db.Uuid
@@ -75,12 +68,6 @@ model MediaTag {
   @@index([status])
   @@map("media_tags")
 }
-
-
-// ======================================================
-// MEDIA ASSET TAG MAP
-// table: media_asset_tags
-// ======================================================
 
 model MediaAssetTag {
   id           String     @id @default(uuid()) @db.Uuid

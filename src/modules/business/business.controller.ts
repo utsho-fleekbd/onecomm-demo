@@ -1,4 +1,4 @@
-import { PermissionAction, RbacFeature } from "@prisma/client";
+import { PackageLimitKey, PermissionAction, RbacFeature } from "@prisma/client";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -28,15 +28,25 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { RequirePermission } from "../permissions/decorators/require-permission.decorator";
 import { PermissionGuard } from "../permissions/guards/permission.guard";
+import { PackageLimitGuard } from "../packages/guards/package-limit.guard";
+import { RequirePackageLimit } from "../packages/decorators/require-package-limit.decorator";
+import { SubscriptionGuard } from "../packages/guards/subscription.guard";
 
 @ApiTags("Business")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, BusinessGuard, PermissionGuard)
+@UseGuards(
+  JwtAuthGuard,
+  SubscriptionGuard,
+  BusinessGuard,
+  PermissionGuard,
+  PackageLimitGuard,
+)
 @Controller("businesses")
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
   @RequirePermission(RbacFeature.BUSINESS_MANAGEMENT, PermissionAction.CREATE)
+  @RequirePackageLimit(PackageLimitKey.MAX_BUSINESSES)
   @Post()
   @ApiOperation({ summary: "Create business" })
   create(

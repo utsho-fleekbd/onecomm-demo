@@ -58,10 +58,8 @@ enum InventoryTransferStatus {
   CANCELLED
 }
 
-
 // ======================================================
-// LOCATION
-// table: inventory_locations
+// Models
 // ======================================================
 
 model InventoryLocation {
@@ -95,12 +93,6 @@ model InventoryLocation {
   @@map("inventory_locations")
 }
 
-
-// ======================================================
-// STOCK BALANCE
-// table: inventory_stocks
-// ======================================================
-
 model InventoryStock {
   id               String   @id @default(uuid()) @db.Uuid
   businessId        String   @map("business_id") @db.Uuid
@@ -123,12 +115,6 @@ model InventoryStock {
   @@index([variantId])
   @@map("inventory_stocks")
 }
-
-
-// ======================================================
-// STOCK BATCH
-// table: inventory_stock_batches
-// ======================================================
 
 model InventoryStockBatch {
   id                String    @id @default(uuid()) @db.Uuid
@@ -159,12 +145,6 @@ model InventoryStockBatch {
   @@map("inventory_stock_batches")
 }
 
-
-// ======================================================
-// STOCK MOVEMENT LEDGER
-// table: inventory_stock_movements
-// ======================================================
-
 model InventoryStockMovement {
   id            String                  @id @default(uuid()) @db.Uuid
   businessId    String                  @map("business_id") @db.Uuid
@@ -193,12 +173,6 @@ model InventoryStockMovement {
   @@index([createdAt])
   @@map("inventory_stock_movements")
 }
-
-
-// ======================================================
-// STOCK ADJUSTMENT
-// table: inventory_stock_adjustments
-// ======================================================
 
 model InventoryStockAdjustment {
   id             String                    @id @default(uuid()) @db.Uuid
@@ -229,12 +203,6 @@ model InventoryStockAdjustment {
   @@map("inventory_stock_adjustments")
 }
 
-
-// ======================================================
-// STOCK ADJUSTMENT ITEM
-// table: inventory_stock_adjustment_items
-// ======================================================
-
 model InventoryStockAdjustmentItem {
   id            String   @id @default(uuid()) @db.Uuid
   adjustmentId  String   @map("adjustment_id") @db.Uuid
@@ -255,12 +223,6 @@ model InventoryStockAdjustmentItem {
   @@index([variantId])
   @@map("inventory_stock_adjustment_items")
 }
-
-
-// ======================================================
-// STOCK TRANSFER
-// table: inventory_stock_transfers
-// ======================================================
 
 model InventoryStockTransfer {
   id             String                  @id @default(uuid()) @db.Uuid
@@ -295,12 +257,6 @@ model InventoryStockTransfer {
   @@index([status])
   @@map("inventory_stock_transfers")
 }
-
-
-// ======================================================
-// STOCK TRANSFER ITEM
-// table: inventory_stock_transfer_items
-// ======================================================
 
 model InventoryStockTransferItem {
   id                  String   @id @default(uuid()) @db.Uuid
