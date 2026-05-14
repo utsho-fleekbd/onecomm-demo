@@ -59,6 +59,7 @@ export class TenantPackageController {
     return this.packages.getCurrentSubscription(this.getTenantId(currentUser));
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/history")
   @ApiOperation({ summary: "Get subscription history" })
   getSubscriptionHistory(
@@ -71,12 +72,14 @@ export class TenantPackageController {
     );
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/usage")
   @ApiOperation({ summary: "Get subscription usage and limits" })
   getUsage(@CurrentUser() currentUser: CurrentUserPayload) {
     return this.packages.getUsage(this.getTenantId(currentUser));
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("plans/:planId/checkout")
   @ApiOperation({ summary: "Create package plan checkout" })
   checkoutPlan(
@@ -86,6 +89,7 @@ export class TenantPackageController {
     return this.packages.checkoutPlan(this.getTenantId(currentUser), planId);
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("addons/:addonId/checkout")
   @ApiOperation({ summary: "Create package add-on checkout" })
   checkoutAddon(
@@ -100,6 +104,7 @@ export class TenantPackageController {
     );
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("mock-payments/:paymentId/confirm")
   @ApiOperation({ summary: "Confirm mock payment" })
   confirmMockPayment(
@@ -112,6 +117,7 @@ export class TenantPackageController {
     );
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.UPDATE)
   @Patch("subscription/cancel")
   @ApiOperation({ summary: "Cancel current subscription" })
   cancelSubscription(
@@ -121,6 +127,7 @@ export class TenantPackageController {
     return this.packages.cancelSubscription(this.getTenantId(currentUser), dto);
   }
 
+  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.DELETE)
   @Delete("subscription/addons/:subscriptionAddonId")
   @ApiOperation({ summary: "Remove subscription add-on" })
   removeAddon(
