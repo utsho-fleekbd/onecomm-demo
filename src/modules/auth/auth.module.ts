@@ -8,9 +8,11 @@ import { AuthController } from "./auth.controller";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { BusinessModule } from "../business/business.module";
 import { PackageModule } from "../packages/package.module";
+import { MailModule } from "../mail/mail.module";
 
 @Module({
   imports: [
+    MailModule,
     PassportModule.register({
       defaultStrategy: "jwt",
     }),

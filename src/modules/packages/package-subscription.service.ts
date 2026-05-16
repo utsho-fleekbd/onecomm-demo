@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
 import {
@@ -151,9 +152,10 @@ export class PackageSubscriptionService {
     });
 
     if (!plan) {
-      throw new NotFoundException("Default package plan is not configured");
+      throw new InternalServerErrorException(
+        "Unable to continue because no default package plan is configured.",
+      );
     }
-
     const now = new Date();
     const trialDays =
       plan.freeTrialDays > 0 ? plan.freeTrialDays : DEFAULT_TRIAL_DAYS;

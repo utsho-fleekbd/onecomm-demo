@@ -22,6 +22,7 @@ enum Gender {
 
 enum OtpPurpose {
     EMAIL_VERIFICATION
+    PASSWORD_RESET
     EMAIL_CHANGE
 }
 
