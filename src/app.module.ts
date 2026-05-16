@@ -10,6 +10,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RoleModule } from "./modules/roles/role.module";
 import { MediaModule } from "./modules/media/media.module";
+import { PublicModule } from "./modules/public/public.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
 import { PackageModule } from "./modules/packages/package.module";
 import { BusinessModule } from "./modules/business/business.module";
@@ -39,6 +40,7 @@ import { RequestContextMiddleware } from "./common/request-context/request-conte
     RoleModule,
     PermissionModule,
     EmployeeModule,
+    PublicModule,
   ],
   controllers: [AppController],
   providers: [

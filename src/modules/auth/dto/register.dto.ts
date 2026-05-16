@@ -8,17 +8,17 @@ import {
 } from "class-validator";
 
 export class RegisterDto {
-  @ApiProperty({ example: "Neo" })
+  @ApiProperty({ example: "John" })
   @IsString()
   @MaxLength(100)
   declare name: string;
 
-  @ApiProperty({ example: "neo@matrix.com" })
+  @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @MaxLength(150)
   declare email: string;
 
-  @ApiProperty({ example: "U$ha11NotPass" })
+  @ApiProperty({ example: "Password@123" })
   @IsString()
   @MinLength(6)
   declare password: string;
