@@ -11,17 +11,17 @@ export class RegisterDto {
   @ApiProperty({ example: "John" })
   @IsString()
   @MaxLength(100)
-  declare name: string;
+  name!: string;
 
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @MaxLength(150)
-  declare email: string;
+  email!: string;
 
   @ApiProperty({ example: "Password@123" })
   @IsString()
   @MinLength(6)
-  declare password: string;
+  password!: string;
 
   @ApiProperty({ example: "My Business" })
   @IsString()

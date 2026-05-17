@@ -135,8 +135,8 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get authenticated user's profile" })
-  me(@CurrentUser() user: CurrentUserPayload) {
-    return this.authService.me(user);
+  getUser(@CurrentUser() user: CurrentUserPayload) {
+    return this.authService.getUser(user);
   }
 
   @Patch("me")

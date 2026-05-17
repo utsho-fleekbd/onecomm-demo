@@ -15,6 +15,7 @@ export class SubscriptionGuard implements CanActivate {
 
     const user = request.user;
 
+    // TODO: not user and return true? ain't it a bit risky?
     if (!user || user.type === SystemUserType.ADMIN) {
       return true;
     }

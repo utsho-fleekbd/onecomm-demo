@@ -5,5 +5,5 @@ export class RequestEmailChangeOrVerificationDto {
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @MaxLength(150)
-  declare email: string;
+  email!: string;
 }

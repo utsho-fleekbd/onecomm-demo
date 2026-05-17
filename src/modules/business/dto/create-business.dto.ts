@@ -21,13 +21,13 @@ export class CreateBusinessSettingDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  declare orderPrefix?: string;
+  orderPrefix?: string;
 
   @ApiPropertyOptional({ example: "INV" })
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  declare invoicePrefix?: string;
+  invoicePrefix?: string;
 
   @ApiPropertyOptional({ example: 5 })
   @IsOptional()
@@ -35,39 +35,39 @@ export class CreateBusinessSettingDto {
   @IsInt()
   @Min(0)
   @Max(999999)
-  declare lowStockThreshold?: number;
+  lowStockThreshold?: number;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()
-  declare allowBackorder?: boolean;
+  allowBackorder?: boolean;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()
-  declare autoConfirmOrder?: boolean;
+  autoConfirmOrder?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()
-  declare codEnabled?: boolean;
+  codEnabled?: boolean;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()
-  declare onlinePaymentEnabled?: boolean;
+  onlinePaymentEnabled?: boolean;
 }
 
 export class CreateBusinessBrandingDto {
   @ApiPropertyOptional({ example: "https://example.com/logo.png" })
   @IsOptional()
   @IsString()
-  declare logoUrl?: string;
+  logoUrl?: string;
 
   @ApiPropertyOptional({ example: "https://example.com/favicon.ico" })
   @IsOptional()
   @IsString()
-  declare faviconUrl?: string;
+  faviconUrl?: string;
 
   @ApiPropertyOptional({ example: "#000742" })
   @IsOptional()
@@ -76,7 +76,7 @@ export class CreateBusinessBrandingDto {
   @Matches(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/, {
     message: "primaryColor must be a valid hex color",
   })
-  declare primaryColor?: string;
+  primaryColor?: string;
 
   @ApiPropertyOptional({ example: "#ffffff" })
   @IsOptional()
@@ -85,7 +85,7 @@ export class CreateBusinessBrandingDto {
   @Matches(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/, {
     message: "secondaryColor must be a valid hex color",
   })
-  declare secondaryColor?: string;
+  secondaryColor?: string;
 
   @ApiPropertyOptional({ example: "#f97316" })
   @IsOptional()
@@ -94,24 +94,24 @@ export class CreateBusinessBrandingDto {
   @Matches(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/, {
     message: "accentColor must be a valid hex color",
   })
-  declare accentColor?: string;
+  accentColor?: string;
 
   @ApiPropertyOptional({ example: "Inter" })
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  declare fontFamily?: string;
+  fontFamily?: string;
 
   @ApiPropertyOptional({ example: "My Business" })
   @IsOptional()
   @IsString()
   @MaxLength(255)
-  declare seoTitle?: string;
+  seoTitle?: string;
 
   @ApiPropertyOptional({ example: "An awesome business" })
   @IsOptional()
   @IsString()
-  declare seoDescription?: string;
+  seoDescription?: string;
 }
 
 export class CreateBusinessDto {
@@ -119,25 +119,25 @@ export class CreateBusinessDto {
   @IsString()
   @MinLength(2)
   @MaxLength(150)
-  declare name: string;
+  name!: string;
 
   @ApiPropertyOptional({ example: "business@example.com" })
   @IsOptional()
   @IsEmail()
   @MaxLength(255)
-  declare email?: string;
+  email?: string;
 
   @ApiPropertyOptional({ example: "+8801712345678" })
   @IsOptional()
   @IsString()
   @MaxLength(30)
-  declare phone?: string;
+  phone?: string;
 
   @ApiPropertyOptional({ example: "Bangladesh" })
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  declare country?: string;
+  country?: string;
 
   @ApiPropertyOptional({ example: "BDT", default: "BDT" })
   @IsOptional()
@@ -146,13 +146,13 @@ export class CreateBusinessDto {
   @Matches(/^[A-Z]{3,10}$/, {
     message: "currencyCode must be uppercase, for example BDT",
   })
-  declare currencyCode?: string;
+  currencyCode?: string;
 
   @ApiPropertyOptional({ example: "Asia/Dhaka", default: "Asia/Dhaka" })
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  declare timezone?: string;
+  timezone?: string;
 
   @ApiPropertyOptional({
     enum: BusinessStatus,
@@ -160,17 +160,17 @@ export class CreateBusinessDto {
   })
   @IsOptional()
   @IsEnum(BusinessStatus)
-  declare status?: BusinessStatus;
+  status?: BusinessStatus;
 
   @ApiPropertyOptional({ type: CreateBusinessSettingDto })
   @IsOptional()
   @ValidateNested()
   @Type(() => CreateBusinessSettingDto)
-  declare settings?: CreateBusinessSettingDto;
+  settings?: CreateBusinessSettingDto;
 
   @ApiPropertyOptional({ type: CreateBusinessBrandingDto })
   @IsOptional()
   @ValidateNested()
   @Type(() => CreateBusinessBrandingDto)
-  declare branding?: CreateBusinessBrandingDto;
+  branding?: CreateBusinessBrandingDto;
 }

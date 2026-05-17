@@ -15,12 +15,12 @@ export class QueryTenantDto {
   @ApiPropertyOptional({ example: "" })
   @IsOptional()
   @IsString()
-  declare search?: string;
+  search?: string;
 
   @ApiPropertyOptional({ enum: SystemUserStatus })
   @IsOptional()
   @IsEnum(SystemUserStatus)
-  declare status?: SystemUserStatus;
+  status?: SystemUserStatus;
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()

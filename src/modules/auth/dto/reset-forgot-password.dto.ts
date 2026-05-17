@@ -5,14 +5,14 @@ export class ResetForgotPasswordDto {
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @MaxLength(150)
-  declare email: string;
+  email!: string;
 
   @ApiProperty({ example: "verification_uuid_here" })
   @IsString()
-  declare verificationId: string;
+  verificationId!: string;
 
   @ApiProperty({ example: "Password@123" })
   @IsString()
   @MinLength(6)
-  declare password: string;
+  password!: string;
 }

@@ -22,5 +22,5 @@ export class AddPermissionDto {
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => PermissionItemDto)
-  declare permissions: PermissionItemDto[];
+  permissions!: PermissionItemDto[];
 }

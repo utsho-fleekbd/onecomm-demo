@@ -344,7 +344,12 @@ export class AuthService {
     }
 
     this.assertActiveUser(user);
-    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
+    // TODO: before removing this line completely, check if everything checks for it or not.
+    // await this.packageSubscriptions.assertTenantSubscriptionActive(user);
+    const activeSubscription =
+      this.packageSubscriptions.findCurrentSubscription(
+        user.tenantId ?? user.id,
+      );
 
     const safeUser = this.toSafeUser(user);
 
@@ -355,11 +360,15 @@ export class AuthService {
         businessId: null,
       });
 
-      return apiResponse({
-        ...tokens,
-        selectedBusiness: null,
-        user: safeUser,
-      });
+      return apiResponse(
+        {
+          ...tokens,
+          selectedBusiness: null,
+          activeSubscription,
+          user: safeUser,
+        },
+        "Authenticated.",
+      );
     }
 
     const businesses = await this.findAccessibleBusinesses(user.id);
@@ -381,6 +390,7 @@ export class AuthService {
         ...tokens,
         selectedBusiness,
         businesses,
+        activeSubscription,
         user: safeUser,
       },
       "Authenticated.",
@@ -985,17 +995,19 @@ export class AuthService {
     });
   }
 
-  async me(user: CurrentUserPayload) {
-    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
-
+  async getUser(user: CurrentUserPayload) {
     if (user.type === SystemUserType.ADMIN) {
       return apiResponse({
         user,
-        selectedBusiness: null,
       });
     }
 
     const businesses = await this.findAccessibleBusinesses(user.id);
+
+    const activeSubscription =
+      await this.packageSubscriptions.findCurrentSubscription(
+        user.tenantId ?? user.id,
+      );
 
     const profile = await this.prisma.systemUserProfile.findFirst({
       where: { userId: user.id },
@@ -1021,6 +1033,7 @@ export class AuthService {
     return apiResponse({
       user,
       profile,
+      activeSubscription,
       selectedBusiness,
       businesses,
     });
@@ -1338,7 +1351,7 @@ export class AuthService {
   }
 
   private toSafeUser(user: SystemUser): SafeSystemUser {
-    const { ...safeUser } = user;
+    const { passwordHash, ...safeUser } = user;
     return safeUser;
   }
 

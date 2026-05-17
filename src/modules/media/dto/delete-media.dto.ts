@@ -1,10 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import {
-  ArrayNotEmpty,
-  ArrayUnique,
-  IsArray,
-  IsUUID,
-} from "class-validator";
+import { ArrayNotEmpty, ArrayUnique, IsArray, IsUUID } from "class-validator";
 
 export class DeleteMediaBulkDto {
   @ApiProperty({
@@ -17,5 +12,5 @@ export class DeleteMediaBulkDto {
   @ArrayNotEmpty()
   @ArrayUnique()
   @IsUUID(undefined, { each: true })
-  declare mediaAssetIds: string[];
+  mediaAssetIds!: string[];
 }

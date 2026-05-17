@@ -8,5 +8,5 @@ export class UpdateEmployeeStatusDto {
     example: SystemUserStatus.ACTIVE,
   })
   @IsEnum(SystemUserStatus)
-  declare status: SystemUserStatus;
+  status!: SystemUserStatus;
 }

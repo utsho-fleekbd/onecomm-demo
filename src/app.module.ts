@@ -15,6 +15,7 @@ import { PackageModule } from "./modules/packages/package.module";
 import { BusinessModule } from "./modules/business/business.module";
 import { EmployeeModule } from "./modules/employees/employee.module";
 import { PermissionModule } from "./modules/permissions/permission.module";
+import { ProductCatalogModule } from "./modules/product-catalog/product-catalog.module";
 
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { RequestLoggerMiddleware } from "./common/middlewares/request-logger.middleware";
@@ -39,6 +40,7 @@ import { RequestContextMiddleware } from "./common/request-context/request-conte
     RoleModule,
     PermissionModule,
     EmployeeModule,
+    ProductCatalogModule,
   ],
   controllers: [AppController],
   providers: [

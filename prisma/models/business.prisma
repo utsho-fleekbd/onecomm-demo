@@ -47,6 +47,17 @@ model Business {
     members   BusinessMember[]
     roles     RbacRole[]
     mediaAssets MediaAsset[]
+
+    productCategories      ProductCategory[]
+    productBrands          ProductBrand[]
+    productUnits           ProductUnit[]
+    productTags            ProductTag[]
+    products               Product[]
+    productVariants        ProductVariant[]
+    productAttributes      ProductAttribute[]
+    productAttributeValues ProductAttributeValue[]
+    productImages          ProductImage[]
+
     auditLogs SystemAuditLog[]
 
     @@unique([slug, ownerUserId])

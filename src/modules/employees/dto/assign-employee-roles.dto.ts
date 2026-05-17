@@ -12,5 +12,5 @@ export class AssignEmployeeRolesDto {
   @IsArray()
   @ArrayUnique()
   @IsUUID(undefined, { each: true })
-  declare roleIds: string[];
+  roleIds!: string[];
 }
