@@ -62,18 +62,17 @@ export class TenantPackageService {
         : {}),
     };
 
-    const [items, total] = await Promise.all([
-      this.prisma.packagePlan.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          limits: true,
-        },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-      }),
-      this.prisma.packagePlan.count({ where }),
-    ]);
+    const items = await this.prisma.packagePlan.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        limits: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+
+    const total = await this.prisma.packagePlan.count({ where });
 
     return paginatedResponse(items, {
       page,

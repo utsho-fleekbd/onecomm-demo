@@ -3,6 +3,14 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from "@nestjs/common";
+import {
   BusinessMemberStatus,
   BusinessStatus,
   OtpPurpose,
@@ -10,14 +18,6 @@ import {
   SystemUserStatus,
   SystemUserType,
 } from "@prisma/client";
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from "@nestjs/common";
 
 import { LoginDto } from "./dto/login.dto";
 import { LogoutDto } from "./dto/logout.dto";
@@ -58,6 +58,8 @@ const ACCESSIBLE_BUSINESS_STATUSES = [
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger("Auth");
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -274,7 +276,14 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendEmailVerificationOtp(dto.email, otp);
+    void this.mailService
+      .sendEmailVerificationOtp(email, otp)
+      .catch((error) => {
+        this.logger.error(
+          `Failed to send verification email to ${email}`,
+          error,
+        );
+      });
 
     return apiResponse(
       {
