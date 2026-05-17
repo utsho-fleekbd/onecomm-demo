@@ -15,11 +15,11 @@ import { ProductVariantStatus } from "@prisma/client";
 import { ProductImagesDto } from "../../common/dto/product-media.dto";
 
 export class ProductVariantAttributeInputDto {
-  @ApiProperty({ example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913" })
+  @ApiProperty({ example: "3f8398d0-5bdb-4c9f-9c75-728c75b6bd2f" })
   @IsUUID()
   attributeId!: string;
 
-  @ApiProperty({ example: "8f375e53-4a7e-49dd-ae7c-3a5d429c7963" })
+  @ApiProperty({ example: "bd1eb78a-7e0c-4d55-8df7-2fda5316dd07" })
   @IsUUID()
   attributeValueId!: string;
 }
@@ -42,12 +42,11 @@ export class CreateProductVariantDto extends ProductImagesDto {
   @MaxLength(100)
   barcode?: string;
 
-  @ApiPropertyOptional({ example: 1200 })
-  @IsOptional()
+  @ApiProperty({ example: 1200 })
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  price?: number;
+  price!: number;
 
   @ApiPropertyOptional({ example: 0.5 })
   @IsOptional()
@@ -69,6 +68,13 @@ export class CreateProductVariantDto extends ProductImagesDto {
   attributes?: ProductVariantAttributeInputDto[];
 }
 
+export class UpdateProductVariantAttributesDto {
+  @ApiProperty({ type: [ProductVariantAttributeInputDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantAttributeInputDto)
+  attributes!: ProductVariantAttributeInputDto[];
+}
 export class UpdateProductVariantDto extends PartialType(
   CreateProductVariantDto,
 ) {}

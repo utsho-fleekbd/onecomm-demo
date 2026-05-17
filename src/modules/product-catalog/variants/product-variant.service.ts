@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, ProductVariantStatus } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -11,11 +7,18 @@ import type { CurrentUserPayload } from "../../auth/decorators/current-user.deco
 import { ProductCatalogLookupService } from "../common/product-catalog-lookup.service";
 import {
   CreateProductVariantDto,
+  ProductVariantAttributeInputDto,
   UpdateProductVariantDto,
 } from "./dto/product-variant.dto";
 
 const VARIANT_INCLUDE = {
-  attributes: { include: { attribute: true, attributeValue: true } },
+  attributes: {
+    include: {
+      attribute: true,
+      attributeValue: true,
+    },
+    orderBy: { createdAt: "asc" },
+  },
   images: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
 } satisfies Prisma.ProductVariantInclude;
 
@@ -32,27 +35,16 @@ export class ProductVariantService {
     productId: string,
     dto: CreateProductVariantDto,
   ) {
-    const product = await this.lookup.assertProductExists(
-      businessId,
-      productId,
-    );
-
-    if (!product.hasVariants) {
-      throw new BadRequestException(
-        "Enable variants on this product before creating variants",
-      );
-    }
-
-    await Promise.all([
-      this.lookup.assertSkuAvailable(businessId, dto.sku),
-      this.lookup.assertBarcodeAvailable(businessId, dto.barcode),
-    ]);
+    await this.lookup.assertProductExists(businessId, productId);
 
     const attributes = await this.lookup.assertAttributeValuePairs(
       businessId,
       productId,
       dto.attributes,
     );
+
+    await this.lookup.assertSkuAvailable(businessId, dto.sku);
+    await this.lookup.assertBarcodeAvailable(businessId, dto.barcode);
 
     try {
       const variant = await this.prisma.productVariant.create({
@@ -62,7 +54,7 @@ export class ProductVariantService {
           title: this.lookup.normalizeName(dto.title),
           sku: this.lookup.normalizeNullableText(dto.sku),
           barcode: this.lookup.normalizeNullableText(dto.barcode),
-          price: dto.price ?? product.price,
+          price: dto.price,
           weight: dto.weight ?? null,
           status: dto.status ?? ProductVariantStatus.ACTIVE,
           createdBy: currentUser.id,
@@ -82,7 +74,7 @@ export class ProductVariantService {
     } catch (error) {
       this.lookup.handleUniqueError(
         error,
-        "Variant SKU or barcode already exists",
+        "Variant SKU, barcode, or attribute already exists",
       );
     }
   }
@@ -121,13 +113,6 @@ export class ProductVariantService {
   ) {
     await this.lookup.assertVariantExists(businessId, productId, variantId);
 
-    await Promise.all([
-      this.lookup.assertSkuAvailable(businessId, dto.sku, { variantId }),
-      this.lookup.assertBarcodeAvailable(businessId, dto.barcode, {
-        variantId,
-      }),
-    ]);
-
     const attributes =
       dto.attributes !== undefined
         ? await this.lookup.assertAttributeValuePairs(
@@ -136,6 +121,11 @@ export class ProductVariantService {
             dto.attributes,
           )
         : undefined;
+
+    await this.lookup.assertSkuAvailable(businessId, dto.sku, { variantId });
+    await this.lookup.assertBarcodeAvailable(businessId, dto.barcode, {
+      variantId,
+    });
 
     try {
       const variant = await this.prisma.$transaction(async (tx) => {
@@ -186,9 +176,21 @@ export class ProductVariantService {
     } catch (error) {
       this.lookup.handleUniqueError(
         error,
-        "Variant SKU or barcode already exists",
+        "Variant SKU, barcode, or attribute already exists",
       );
     }
+  }
+
+  async updateAttributes(
+    currentUser: CurrentUserPayload,
+    businessId: string,
+    productId: string,
+    variantId: string,
+    attributes: ProductVariantAttributeInputDto[],
+  ) {
+    return this.update(currentUser, businessId, productId, variantId, {
+      attributes,
+    });
   }
 
   async remove(
@@ -212,7 +214,7 @@ export class ProductVariantService {
   }
 
   private buildAttributeCreate(
-    attributes: { attributeId: string; attributeValueId: string }[] = [],
+    attributes: ProductVariantAttributeInputDto[] = [],
   ) {
     return attributes.length > 0
       ? {

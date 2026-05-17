@@ -22,6 +22,7 @@ import type { CurrentUserPayload } from "../../auth/decorators/current-user.deco
 import { ProductVariantService } from "./product-variant.service";
 import {
   CreateProductVariantDto,
+  UpdateProductVariantAttributesDto,
   UpdateProductVariantDto,
 } from "./dto/product-variant.dto";
 
@@ -90,6 +91,28 @@ export class ProductVariantController {
     @Body() dto: UpdateProductVariantDto,
   ) {
     return this.variants.update(user, businessId, productId, variantId, dto);
+  }
+
+  @RequirePermission(
+    RbacFeature.PRODUCT_CATALOG_MANAGEMENT,
+    PermissionAction.UPDATE,
+  )
+  @Patch(":variantId/attributes")
+  @ApiOperation({ summary: "Update product variant attributes" })
+  updateAttributes(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param("businessId", ParseUUIDPipe) businessId: string,
+    @Param("productId", ParseUUIDPipe) productId: string,
+    @Param("variantId", ParseUUIDPipe) variantId: string,
+    @Body() dto: UpdateProductVariantAttributesDto,
+  ) {
+    return this.variants.updateAttributes(
+      user,
+      businessId,
+      productId,
+      variantId,
+      dto.attributes,
+    );
   }
 
   @RequirePermission(

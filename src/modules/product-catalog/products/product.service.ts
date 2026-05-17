@@ -1,12 +1,7 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import {
   CatalogProductStatus,
   Prisma,
-  ProductAttributeScope,
   ProductSimpleStatus,
 } from "@prisma/client";
 
@@ -28,15 +23,24 @@ const PRODUCT_INCLUDE = {
   brand: true,
   unit: true,
   tags: { include: { tag: true } },
-  images: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
   attributes: {
     where: { deletedAt: null },
-    include: { values: { where: { deletedAt: null } } },
+    include: {
+      values: { where: { deletedAt: null }, orderBy: { createdAt: "asc" } },
+    },
+    orderBy: { name: "asc" },
   },
+  images: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
   variants: {
     where: { deletedAt: null },
     include: {
-      attributes: { include: { attribute: true, attributeValue: true } },
+      attributes: {
+        include: {
+          attribute: true,
+          attributeValue: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
       images: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
     },
   },
@@ -55,10 +59,6 @@ export class ProductService {
     dto: CreateProductDto,
   ) {
     await this.lookup.assertProductReferences(businessId, dto);
-    await Promise.all([
-      this.lookup.assertSkuAvailable(businessId, dto.sku),
-      this.lookup.assertBarcodeAvailable(businessId, dto.barcode),
-    ]);
 
     const tagIds = await this.lookup.assertTagsExist(businessId, dto.tagIds);
     const slug = await this.lookup.generateUniqueProductSlug(
@@ -76,10 +76,6 @@ export class ProductService {
           name: this.lookup.normalizeName(dto.name),
           slug,
           description: this.lookup.normalizeNullableText(dto.description),
-          sku: this.lookup.normalizeNullableText(dto.sku),
-          barcode: this.lookup.normalizeNullableText(dto.barcode),
-          hasVariants: dto.hasVariants ?? false,
-          price: dto.price ?? 0,
           status: dto.status ?? CatalogProductStatus.DRAFT,
           createdBy: currentUser.id,
           updatedBy: currentUser.id,
@@ -91,10 +87,7 @@ export class ProductService {
 
       return apiResponse(product, "Product created successfully");
     } catch (error) {
-      this.lookup.handleUniqueError(
-        error,
-        "Product SKU, barcode, or slug already exists",
-      );
+      this.lookup.handleUniqueError(error, "Product slug already exists");
     }
   }
 
@@ -115,8 +108,20 @@ export class ProductService {
             OR: [
               { name: { contains: query.search, mode: "insensitive" } },
               { slug: { contains: query.search, mode: "insensitive" } },
-              { sku: { contains: query.search, mode: "insensitive" } },
-              { barcode: { contains: query.search, mode: "insensitive" } },
+              {
+                variants: {
+                  some: {
+                    sku: { contains: query.search, mode: "insensitive" },
+                  },
+                },
+              },
+              {
+                variants: {
+                  some: {
+                    barcode: { contains: query.search, mode: "insensitive" },
+                  },
+                },
+              },
             ],
           }
         : {}),
@@ -163,14 +168,6 @@ export class ProductService {
     await this.lookup.assertProductExists(businessId, productId);
     await this.lookup.assertProductReferences(businessId, dto);
 
-    await Promise.all([
-      this.lookup.assertSkuAvailable(businessId, dto.sku, { productId }),
-      this.lookup.assertBarcodeAvailable(businessId, dto.barcode, {
-        productId,
-      }),
-      this.assertCanChangeVariantMode(businessId, productId, dto.hasVariants),
-    ]);
-
     const tagIds =
       dto.tagIds !== undefined
         ? await this.lookup.assertTagsExist(businessId, dto.tagIds)
@@ -184,7 +181,7 @@ export class ProductService {
 
         if (dto.images !== undefined) {
           await tx.productImage.updateMany({
-            where: { productId, deletedAt: null },
+            where: { productId, variantId: null, deletedAt: null },
             data: { deletedAt: new Date(), updatedBy: currentUser.id },
           });
         }
@@ -203,16 +200,6 @@ export class ProductService {
             ...(dto.description !== undefined && {
               description: this.lookup.normalizeNullableText(dto.description),
             }),
-            ...(dto.sku !== undefined && {
-              sku: this.lookup.normalizeNullableText(dto.sku),
-            }),
-            ...(dto.barcode !== undefined && {
-              barcode: this.lookup.normalizeNullableText(dto.barcode),
-            }),
-            ...(dto.hasVariants !== undefined && {
-              hasVariants: dto.hasVariants,
-            }),
-            ...(dto.price !== undefined && { price: dto.price }),
             ...(dto.status !== undefined && { status: dto.status }),
             updatedBy: currentUser.id,
             ...(tagIds !== undefined && { tags: this.buildTagCreate(tagIds) }),
@@ -230,10 +217,7 @@ export class ProductService {
 
       return apiResponse(product, "Product updated successfully");
     } catch (error) {
-      this.lookup.handleUniqueError(
-        error,
-        "Product SKU, barcode, or slug already exists",
-      );
+      this.lookup.handleUniqueError(error, "Product slug already exists");
     }
   }
 
@@ -258,6 +242,32 @@ export class ProductService {
         where: { productId, deletedAt: null },
         data: { deletedAt: new Date(), updatedBy: currentUser.id },
       });
+
+      await tx.productAttribute.updateMany({
+        where: { productId, deletedAt: null },
+        data: {
+          status: ProductSimpleStatus.INACTIVE,
+          deletedAt: new Date(),
+          updatedBy: currentUser.id,
+        },
+      });
+
+      const attributes = await tx.productAttribute.findMany({
+        where: { productId },
+        select: { id: true },
+      });
+      const attributeIds = attributes.map((attribute) => attribute.id);
+
+      if (attributeIds.length > 0) {
+        await tx.productVariantAttribute.deleteMany({
+          where: { attributeId: { in: attributeIds } },
+        });
+
+        await tx.productAttributeValue.updateMany({
+          where: { attributeId: { in: attributeIds }, deletedAt: null },
+          data: { deletedAt: new Date(), updatedBy: currentUser.id },
+        });
+      }
     });
 
     return apiResponse(null, "Product deleted successfully");
@@ -287,56 +297,5 @@ export class ProductService {
           })),
         }
       : undefined;
-  }
-
-  private async assertCanChangeVariantMode(
-    businessId: string,
-    productId: string,
-    hasVariants?: boolean,
-  ) {
-    if (hasVariants === undefined) {
-      return;
-    }
-
-    if (hasVariants) {
-      const productAttributeCount = await this.prisma.productAttribute.count({
-        where: {
-          businessId,
-          productId,
-          scope: ProductAttributeScope.PRODUCT,
-          deletedAt: null,
-          status: ProductSimpleStatus.ACTIVE,
-        },
-      });
-
-      if (productAttributeCount > 0) {
-        throw new BadRequestException(
-          "Remove product-level attributes before enabling variants",
-        );
-      }
-
-      return;
-    }
-
-    const [variantCount, variantAttributeCount] = await Promise.all([
-      this.prisma.productVariant.count({
-        where: { businessId, productId, deletedAt: null },
-      }),
-      this.prisma.productAttribute.count({
-        where: {
-          businessId,
-          productId,
-          scope: ProductAttributeScope.VARIANT,
-          deletedAt: null,
-          status: ProductSimpleStatus.ACTIVE,
-        },
-      }),
-    ]);
-
-    if (variantCount > 0 || variantAttributeCount > 0) {
-      throw new BadRequestException(
-        "Remove variants and variant attributes before disabling variants",
-      );
-    }
   }
 }

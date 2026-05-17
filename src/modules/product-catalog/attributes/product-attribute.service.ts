@@ -3,11 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  Prisma,
-  ProductAttributeScope,
-  ProductSimpleStatus,
-} from "@prisma/client";
+import { Prisma, ProductSimpleStatus } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { apiResponse } from "../../../common/utils/api-response.util";
@@ -24,6 +20,11 @@ const ATTRIBUTE_INCLUDE = {
   values: { where: { deletedAt: null }, orderBy: { createdAt: "asc" } },
 } satisfies Prisma.ProductAttributeInclude;
 
+const ATTRIBUTE_ORDER = [
+  { name: "asc" },
+  { createdAt: "asc" },
+] satisfies Prisma.ProductAttributeOrderByWithRelationInput[];
+
 @Injectable()
 export class ProductAttributeService {
   constructor(
@@ -37,11 +38,9 @@ export class ProductAttributeService {
     productId: string,
     dto: CreateProductAttributeDto,
   ) {
-    const product = await this.lookup.assertProductExists(
-      businessId,
-      productId,
-    );
-    this.assertScopeMatchesProductMode(product.hasVariants, dto.scope);
+    await this.lookup.assertProductExists(businessId, productId);
+
+    const values = this.normalizeValues(dto.values);
 
     try {
       const attribute = await this.prisma.productAttribute.create({
@@ -49,27 +48,30 @@ export class ProductAttributeService {
           businessId,
           productId,
           name: this.lookup.normalizeName(dto.name),
-          scope: dto.scope,
           status: dto.status ?? ProductSimpleStatus.ACTIVE,
           createdBy: currentUser.id,
           updatedBy: currentUser.id,
-          values: dto.values?.length
-            ? {
-                create: dto.values.map((value) => ({
-                  businessId,
-                  name: this.lookup.normalizeName(value.name),
-                  createdBy: currentUser.id,
-                  updatedBy: currentUser.id,
-                })),
-              }
-            : undefined,
+          values:
+            values.length > 0
+              ? {
+                  create: values.map((value) => ({
+                    businessId,
+                    value,
+                    createdBy: currentUser.id,
+                    updatedBy: currentUser.id,
+                  })),
+                }
+              : undefined,
         },
         include: ATTRIBUTE_INCLUDE,
       });
 
       return apiResponse(attribute, "Product attribute created successfully");
     } catch (error) {
-      this.lookup.handleUniqueError(error, "Product attribute already exists");
+      this.lookup.handleUniqueError(
+        error,
+        "Product attribute or value already exists",
+      );
     }
   }
 
@@ -77,13 +79,9 @@ export class ProductAttributeService {
     await this.lookup.assertProductExists(businessId, productId);
 
     const attributes = await this.prisma.productAttribute.findMany({
-      where: {
-        businessId,
-        productId,
-        deletedAt: null,
-      },
+      where: { businessId, productId, deletedAt: null },
       include: ATTRIBUTE_INCLUDE,
-      orderBy: { createdAt: "asc" },
+      orderBy: ATTRIBUTE_ORDER,
     });
 
     return apiResponse(attributes);
@@ -96,38 +94,22 @@ export class ProductAttributeService {
     attributeId: string,
     dto: UpdateProductAttributeDto,
   ) {
-    const attribute = await this.findAttributeOrThrow(
-      businessId,
-      productId,
-      attributeId,
-    );
-
-    if (dto.scope !== undefined && dto.scope !== attribute.scope) {
-      const product = await this.lookup.assertProductExists(
-        businessId,
-        productId,
-      );
-      this.assertScopeMatchesProductMode(product.hasVariants, dto.scope);
-    }
+    await this.findAttributeOrThrow(businessId, productId, attributeId);
 
     try {
-      const updatedAttribute = await this.prisma.productAttribute.update({
+      const attribute = await this.prisma.productAttribute.update({
         where: { id: attributeId },
         data: {
           ...(dto.name !== undefined && {
             name: this.lookup.normalizeName(dto.name),
           }),
-          ...(dto.scope !== undefined && { scope: dto.scope }),
           ...(dto.status !== undefined && { status: dto.status }),
           updatedBy: currentUser.id,
         },
         include: ATTRIBUTE_INCLUDE,
       });
 
-      return apiResponse(
-        updatedAttribute,
-        "Product attribute updated successfully",
-      );
+      return apiResponse(attribute, "Product attribute updated successfully");
     } catch (error) {
       this.lookup.handleUniqueError(error, "Product attribute already exists");
     }
@@ -141,19 +123,25 @@ export class ProductAttributeService {
   ) {
     await this.findAttributeOrThrow(businessId, productId, attributeId);
 
-    await this.prisma.productAttribute.update({
-      where: { id: attributeId },
-      data: {
-        status: ProductSimpleStatus.INACTIVE,
-        deletedAt: new Date(),
-        updatedBy: currentUser.id,
-        values: {
-          updateMany: {
-            where: { deletedAt: null },
-            data: { deletedAt: new Date(), updatedBy: currentUser.id },
-          },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.productVariantAttribute.deleteMany({ where: { attributeId } });
+
+      await tx.productAttributeValue.updateMany({
+        where: { attributeId, deletedAt: null },
+        data: {
+          deletedAt: new Date(),
+          updatedBy: currentUser.id,
         },
-      },
+      });
+
+      await tx.productAttribute.update({
+        where: { id: attributeId },
+        data: {
+          status: ProductSimpleStatus.INACTIVE,
+          deletedAt: new Date(),
+          updatedBy: currentUser.id,
+        },
+      });
     });
 
     return apiResponse(null, "Product attribute deleted successfully");
@@ -173,7 +161,7 @@ export class ProductAttributeService {
         data: {
           businessId,
           attributeId,
-          name: this.lookup.normalizeName(dto.name),
+          value: this.lookup.normalizeName(dto.value),
           createdBy: currentUser.id,
           updatedBy: currentUser.id,
         },
@@ -202,8 +190,8 @@ export class ProductAttributeService {
       const value = await this.prisma.productAttributeValue.update({
         where: { id: valueId },
         data: {
-          ...(dto.name !== undefined && {
-            name: this.lookup.normalizeName(dto.name),
+          ...(dto.value !== undefined && {
+            value: this.lookup.normalizeName(dto.value),
           }),
           updatedBy: currentUser.id,
         },
@@ -227,12 +215,18 @@ export class ProductAttributeService {
   ) {
     await this.findValueOrThrow(businessId, productId, attributeId, valueId);
 
-    await this.prisma.productAttributeValue.update({
-      where: { id: valueId },
-      data: {
-        deletedAt: new Date(),
-        updatedBy: currentUser.id,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.productVariantAttribute.deleteMany({
+        where: { attributeId, attributeValueId: valueId },
+      });
+
+      await tx.productAttributeValue.update({
+        where: { id: valueId },
+        data: {
+          deletedAt: new Date(),
+          updatedBy: currentUser.id,
+        },
+      });
     });
 
     return apiResponse(null, "Product attribute value deleted successfully");
@@ -243,8 +237,11 @@ export class ProductAttributeService {
     productId: string,
     attributeId: string,
   ) {
+    await this.lookup.assertProductExists(businessId, productId);
+
     const attribute = await this.prisma.productAttribute.findFirst({
       where: { id: attributeId, businessId, productId, deletedAt: null },
+      include: ATTRIBUTE_INCLUDE,
     });
 
     if (!attribute) {
@@ -273,20 +270,18 @@ export class ProductAttributeService {
     return value;
   }
 
-  private assertScopeMatchesProductMode(
-    hasVariants: boolean,
-    scope: ProductAttributeScope,
-  ) {
-    if (hasVariants && scope === ProductAttributeScope.PRODUCT) {
-      throw new BadRequestException(
-        "Products with variants must use variant attributes",
-      );
+  private normalizeValues(values: CreateProductAttributeValueDto[] = []) {
+    const normalizedValues = values.map((item) =>
+      this.lookup.normalizeName(item.value),
+    );
+    const uniqueValues = new Set(
+      normalizedValues.map((value) => value.toLowerCase()),
+    );
+
+    if (uniqueValues.size !== normalizedValues.length) {
+      throw new BadRequestException("Attribute values must be unique");
     }
 
-    if (!hasVariants && scope === ProductAttributeScope.VARIANT) {
-      throw new BadRequestException(
-        "Simple products must use product attributes",
-      );
-    }
+    return normalizedValues;
   }
 }

@@ -4,12 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  CatalogProductStatus,
-  Prisma,
-  ProductAttributeScope,
-  ProductSimpleStatus,
-} from "@prisma/client";
+import { Prisma, ProductSimpleStatus } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { generateRandomSlug } from "../../../common/utils/slug-generator.util";
@@ -173,7 +168,7 @@ export class ProductCatalogLookupService {
   async assertSkuAvailable(
     businessId: string,
     sku?: string | null,
-    exclude?: { productId?: string; variantId?: string },
+    exclude?: { variantId?: string },
   ) {
     const normalizedSku = this.normalizeNullableText(sku);
 
@@ -181,28 +176,17 @@ export class ProductCatalogLookupService {
       return;
     }
 
-    const [product, variant] = await Promise.all([
-      this.prisma.product.findFirst({
-        where: {
-          businessId,
-          sku: normalizedSku,
-          deletedAt: null,
-          ...(exclude?.productId ? { id: { not: exclude.productId } } : {}),
-        },
-        select: { id: true },
-      }),
-      this.prisma.productVariant.findFirst({
-        where: {
-          businessId,
-          sku: normalizedSku,
-          deletedAt: null,
-          ...(exclude?.variantId ? { id: { not: exclude.variantId } } : {}),
-        },
-        select: { id: true },
-      }),
-    ]);
+    const variant = await this.prisma.productVariant.findFirst({
+      where: {
+        businessId,
+        sku: normalizedSku,
+        deletedAt: null,
+        ...(exclude?.variantId ? { id: { not: exclude.variantId } } : {}),
+      },
+      select: { id: true },
+    });
 
-    if (product || variant) {
+    if (variant) {
       throw new ConflictException("SKU already exists for this business");
     }
   }
@@ -210,7 +194,7 @@ export class ProductCatalogLookupService {
   async assertBarcodeAvailable(
     businessId: string,
     barcode?: string | null,
-    exclude?: { productId?: string; variantId?: string },
+    exclude?: { variantId?: string },
   ) {
     const normalizedBarcode = this.normalizeNullableText(barcode);
 
@@ -218,30 +202,74 @@ export class ProductCatalogLookupService {
       return;
     }
 
-    const [product, variant] = await Promise.all([
-      this.prisma.product.findFirst({
-        where: {
-          businessId,
-          barcode: normalizedBarcode,
-          deletedAt: null,
-          ...(exclude?.productId ? { id: { not: exclude.productId } } : {}),
-        },
-        select: { id: true },
-      }),
-      this.prisma.productVariant.findFirst({
-        where: {
-          businessId,
-          barcode: normalizedBarcode,
-          deletedAt: null,
-          ...(exclude?.variantId ? { id: { not: exclude.variantId } } : {}),
-        },
-        select: { id: true },
-      }),
-    ]);
+    const variant = await this.prisma.productVariant.findFirst({
+      where: {
+        businessId,
+        barcode: normalizedBarcode,
+        deletedAt: null,
+        ...(exclude?.variantId ? { id: { not: exclude.variantId } } : {}),
+      },
+      select: { id: true },
+    });
 
-    if (product || variant) {
+    if (variant) {
       throw new ConflictException("Barcode already exists for this business");
     }
+  }
+
+  async assertAttributeValuePairs(
+    businessId: string,
+    productId: string,
+    pairs: { attributeId: string; attributeValueId: string }[] = [],
+  ) {
+    if (pairs.length === 0) {
+      return pairs;
+    }
+
+    const attributeIds = pairs.map((pair) => pair.attributeId);
+    const uniqueAttributeIds = new Set(attributeIds);
+
+    if (uniqueAttributeIds.size !== pairs.length) {
+      throw new BadRequestException(
+        "Variant cannot use the same attribute more than once",
+      );
+    }
+
+    const valueIds = pairs.map((pair) => pair.attributeValueId);
+    const values = await this.prisma.productAttributeValue.findMany({
+      where: {
+        businessId,
+        id: { in: valueIds },
+        deletedAt: null,
+        attribute: {
+          businessId,
+          productId,
+          id: { in: attributeIds },
+          deletedAt: null,
+          status: ProductSimpleStatus.ACTIVE,
+        },
+      },
+      select: {
+        id: true,
+        attributeId: true,
+      },
+    });
+
+    const validPairs = new Set(
+      values.map((value) => `${value.attributeId}:${value.id}`),
+    );
+
+    const hasInvalidPair = pairs.some(
+      (pair) => !validPairs.has(`${pair.attributeId}:${pair.attributeValueId}`),
+    );
+
+    if (hasInvalidPair || values.length !== pairs.length) {
+      throw new BadRequestException(
+        "One or more variant attribute values are invalid",
+      );
+    }
+
+    return pairs;
   }
 
   async generateUniqueProductSlug(
@@ -273,58 +301,6 @@ export class ProductCatalogLookupService {
     }
 
     throw new ConflictException("Could not generate a unique product slug");
-  }
-
-  async assertAttributeValuePairs(
-    businessId: string,
-    productId: string,
-    pairs: { attributeId: string; attributeValueId: string }[] = [],
-  ) {
-    const normalizedPairs = [
-      ...new Map(pairs.map((pair) => [pair.attributeId, pair])).values(),
-    ];
-
-    for (const pair of normalizedPairs) {
-      const attribute = await this.prisma.productAttribute.findFirst({
-        where: {
-          id: pair.attributeId,
-          businessId,
-          productId,
-          scope: ProductAttributeScope.VARIANT,
-          deletedAt: null,
-          status: ProductSimpleStatus.ACTIVE,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (!attribute) {
-        throw new BadRequestException(
-          "One or more variant attributes are invalid",
-        );
-      }
-
-      const value = await this.prisma.productAttributeValue.findFirst({
-        where: {
-          id: pair.attributeValueId,
-          businessId,
-          attributeId: pair.attributeId,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (!value) {
-        throw new BadRequestException(
-          "One or more variant attribute values are invalid",
-        );
-      }
-    }
-
-    return normalizedPairs;
   }
 
   normalizeName(value: string) {

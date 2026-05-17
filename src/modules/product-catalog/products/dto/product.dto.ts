@@ -1,9 +1,7 @@
 import { Type } from "class-transformer";
 import {
   IsArray,
-  IsBoolean,
   IsEnum,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -13,10 +11,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { CatalogProductStatus } from "@prisma/client";
-import {
-  ProductImagesDto,
-  ProductTagIdsDto,
-} from "../../common/dto/product-media.dto";
+import { ProductImagesDto } from "../../common/dto/product-media.dto";
 import { CatalogSortOrder } from "../../common/dto/query-catalog.dto";
 
 export class CreateProductDto extends ProductImagesDto {
@@ -29,18 +24,6 @@ export class CreateProductDto extends ProductImagesDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @ApiPropertyOptional({ example: "SKU-001" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  sku?: string;
-
-  @ApiPropertyOptional({ example: "0123456789012" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  barcode?: string;
 
   @ApiPropertyOptional({ example: "2d8d0f8f-95aa-4f23-a2fd-0ca6f5f8a913" })
   @IsOptional()
@@ -56,18 +39,6 @@ export class CreateProductDto extends ProductImagesDto {
   @IsOptional()
   @IsUUID()
   unitId?: string;
-
-  @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @IsBoolean()
-  hasVariants?: boolean;
-
-  @ApiPropertyOptional({ example: 1200 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  price?: number;
 
   @ApiPropertyOptional({ enum: CatalogProductStatus })
   @IsOptional()

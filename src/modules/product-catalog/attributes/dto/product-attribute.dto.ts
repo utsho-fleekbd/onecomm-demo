@@ -9,37 +9,32 @@ import {
   ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
-import { ProductAttributeScope, ProductSimpleStatus } from "@prisma/client";
+import { ProductSimpleStatus } from "@prisma/client";
 
 export class CreateProductAttributeValueDto {
   @ApiProperty({ example: "Red" })
   @IsString()
-  @MaxLength(100)
-  name!: string;
+  @MaxLength(150)
+  value!: string;
 }
 
 export class UpdateProductAttributeValueDto extends PartialType(
   CreateProductAttributeValueDto,
 ) {}
 
-export class CreateProductAttributeDto {
+export class ProductAttributeBaseDto {
   @ApiProperty({ example: "Color" })
   @IsString()
   @MaxLength(100)
   name!: string;
 
-  @ApiProperty({
-    enum: ProductAttributeScope,
-    example: ProductAttributeScope.VARIANT,
-  })
-  @IsEnum(ProductAttributeScope)
-  scope!: ProductAttributeScope;
-
   @ApiPropertyOptional({ enum: ProductSimpleStatus })
   @IsOptional()
   @IsEnum(ProductSimpleStatus)
   status?: ProductSimpleStatus;
+}
 
+export class CreateProductAttributeDto extends ProductAttributeBaseDto {
   @ApiPropertyOptional({ type: [CreateProductAttributeValueDto] })
   @IsOptional()
   @IsArray()
@@ -50,5 +45,5 @@ export class CreateProductAttributeDto {
 }
 
 export class UpdateProductAttributeDto extends PartialType(
-  CreateProductAttributeDto,
+  ProductAttributeBaseDto,
 ) {}
