@@ -69,7 +69,7 @@ export class AuthController {
   @ApiOperation({ summary: "Send otp for email change" })
   requestEmailChange(
     @CurrentUser() user: CurrentUserPayload,
-    dto: RequestEmailChangeOrVerificationDto,
+    @Body() dto: RequestEmailChangeOrVerificationDto,
   ) {
     return this.authService.requestEmailChange(user.id, dto);
   }

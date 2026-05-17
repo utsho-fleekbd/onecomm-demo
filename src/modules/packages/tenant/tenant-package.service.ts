@@ -68,6 +68,14 @@ export class TenantPackageService {
       take: limit,
       include: {
         limits: true,
+        features: {
+          where: {
+            isActive: true,
+          },
+          orderBy: {
+            sortOrder: "asc",
+          },
+        },
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
@@ -154,7 +162,19 @@ export class TenantPackageService {
         skip,
         take: limit,
         include: {
-          package: true,
+          package: {
+            include: {
+              limits: true,
+              features: {
+                where: {
+                  isActive: true,
+                },
+                orderBy: {
+                  sortOrder: "asc",
+                },
+              },
+            },
+          },
           addons: {
             include: {
               addon: true,
@@ -206,7 +226,19 @@ export class TenantPackageService {
         expiresAt: this.getPaymentExpiry(),
       },
       include: {
-        plan: true,
+        plan: {
+          include: {
+            limits: true,
+            features: {
+              where: {
+                isActive: true,
+              },
+              orderBy: {
+                sortOrder: "asc",
+              },
+            },
+          },
+        },
       },
     });
 

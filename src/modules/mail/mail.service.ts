@@ -9,7 +9,6 @@ type OtpEmailOptions = {
   title: string;
   description: string;
   otp: string;
-  expiresInMinutes?: number;
 };
 
 @Injectable()
@@ -17,10 +16,14 @@ export class MailService {
   private readonly transporter: Transporter;
   private readonly from: string;
   private readonly appName: string;
+  private readonly optExpiresIn: number;
 
   constructor(private readonly configService: ConfigService) {
     this.from = this.configService.getOrThrow<string>("MAIL_FROM");
-    this.appName = this.configService.get<string>("APP_NAME") ?? "Onecomm";
+    this.appName = this.configService.getOrThrow<string>("APP_NAME");
+    this.optExpiresIn = this.configService.getOrThrow<number>(
+      "OTP_EXPIRES_IN_MINS",
+    );
 
     this.transporter = nodemailer.createTransport({
       host: this.configService.getOrThrow<string>("MAIL_HOST"),
@@ -67,8 +70,6 @@ export class MailService {
   }
 
   private async sendOtpEmail(options: OtpEmailOptions) {
-    const expiresInMinutes = options.expiresInMinutes ?? 10;
-
     await this.transporter.sendMail({
       from: this.from,
       to: options.to,
@@ -79,12 +80,11 @@ ${options.description}
 
 Your verification code is: ${options.otp}
 
-This code will expire in ${expiresInMinutes} minutes.
+This code will expire in ${this.optExpiresIn} minutes.
 
 If you did not request this, you can safely ignore this email.`,
       html: this.buildOtpEmailHtml({
         ...options,
-        expiresInMinutes,
       }),
     });
   }
@@ -151,7 +151,7 @@ If you did not request this, you can safely ignore this email.`,
                     <td style="padding:4px 32px 32px;">
                       <p style="margin:0; font-size:14px; line-height:1.7; color:#4b5563;">
                         This code will expire in 
-                        <strong style="color:#111827;">${options.expiresInMinutes} minutes</strong>.
+                        <strong style="color:#111827;">${this.optExpiresIn} minutes</strong>.
                       </p>
 
                       <p style="margin:16px 0 0; font-size:14px; line-height:1.7; color:#6b7280;">

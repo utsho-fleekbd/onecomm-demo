@@ -49,6 +49,32 @@ export class PackagePlanLimitDto {
   description?: string;
 }
 
+export class PackagePlanFeatureDto {
+  @ApiProperty({ example: "Unlimited products" })
+  @IsString()
+  @MaxLength(255)
+  title!: string;
+
+  @ApiPropertyOptional({
+    example: "Create as many products as your catalogue needs",
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class CreatePackagePlanDto {
   @ApiProperty({ example: "Starter" })
   @IsString()
@@ -110,6 +136,14 @@ export class CreatePackagePlanDto {
   @ValidateNested({ each: true })
   @Type(() => PackagePlanLimitDto)
   limits?: PackagePlanLimitDto[];
+
+  @ApiPropertyOptional({ type: [PackagePlanFeatureDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => PackagePlanFeatureDto)
+  features?: PackagePlanFeatureDto[];
 }
 
 export class UpdatePackagePlanDto extends PartialType(CreatePackagePlanDto) {}

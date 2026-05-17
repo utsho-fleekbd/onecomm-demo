@@ -30,7 +30,7 @@ import {
 } from "./dto/tenant-package.dto";
 
 @ApiTags("Tenant Packages")
-@UseGuards(JwtAuthGuard, SubscriptionGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller("tenant/packages")
 export class TenantPackageController {
   constructor(
@@ -54,6 +54,7 @@ export class TenantPackageController {
   }
 
   @ApiBearerAuth()
+  @UseGuards(SubscriptionGuard)
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/current")
   @ApiOperation({ summary: "Get current subscription" })
@@ -76,6 +77,7 @@ export class TenantPackageController {
   }
 
   @ApiBearerAuth()
+  @UseGuards(SubscriptionGuard)
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/usage")
   @ApiOperation({ summary: "Get subscription usage and limits" })
@@ -95,6 +97,7 @@ export class TenantPackageController {
   }
 
   @ApiBearerAuth()
+  @UseGuards(SubscriptionGuard)
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("addons/:addonId/checkout")
   @ApiOperation({ summary: "Create package add-on checkout" })
@@ -125,6 +128,7 @@ export class TenantPackageController {
   }
 
   @ApiBearerAuth()
+  @UseGuards(SubscriptionGuard)
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.UPDATE)
   @Patch("subscription/cancel")
   @ApiOperation({ summary: "Cancel current subscription" })
@@ -136,6 +140,7 @@ export class TenantPackageController {
   }
 
   @ApiBearerAuth()
+  @UseGuards(SubscriptionGuard)
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.DELETE)
   @Delete("subscription/addons/:subscriptionAddonId")
   @ApiOperation({ summary: "Remove subscription add-on" })
