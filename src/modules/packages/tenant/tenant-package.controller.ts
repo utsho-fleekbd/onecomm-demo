@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, RbacFeature } from "@prisma/client";
 
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { Public } from "../../auth/decorators/public.decorator";
 import { PermissionGuard } from "../../permissions/guards/permission.guard";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import type { CurrentUserPayload } from "../../auth/decorators/current-user.decorator";
@@ -29,7 +30,6 @@ import {
 } from "./dto/tenant-package.dto";
 
 @ApiTags("Tenant Packages")
-@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, SubscriptionGuard, PermissionGuard)
 @Controller("tenant/packages")
 export class TenantPackageController {
@@ -38,13 +38,14 @@ export class TenantPackageController {
     private readonly subscriptions: PackageSubscriptionService,
   ) {}
 
-  @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
+  @Public()
   @Get("plans")
   @ApiOperation({ summary: "Get available package plans" })
   findPlans(@Query() query: QueryPackageDto) {
     return this.packages.findAvailablePlans(query);
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("addons")
   @ApiOperation({ summary: "Get available package add-ons" })
@@ -52,6 +53,7 @@ export class TenantPackageController {
     return this.packages.findAvailableAddons(query);
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/current")
   @ApiOperation({ summary: "Get current subscription" })
@@ -59,6 +61,7 @@ export class TenantPackageController {
     return this.packages.getCurrentSubscription(this.getTenantId(currentUser));
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/history")
   @ApiOperation({ summary: "Get subscription history" })
@@ -72,6 +75,7 @@ export class TenantPackageController {
     );
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.READ)
   @Get("subscription/usage")
   @ApiOperation({ summary: "Get subscription usage and limits" })
@@ -79,6 +83,7 @@ export class TenantPackageController {
     return this.packages.getUsage(this.getTenantId(currentUser));
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("plans/:planId/checkout")
   @ApiOperation({ summary: "Create package plan checkout" })
@@ -89,6 +94,7 @@ export class TenantPackageController {
     return this.packages.checkoutPlan(this.getTenantId(currentUser), planId);
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("addons/:addonId/checkout")
   @ApiOperation({ summary: "Create package add-on checkout" })
@@ -104,6 +110,7 @@ export class TenantPackageController {
     );
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.CREATE)
   @Post("mock-payments/:paymentId/confirm")
   @ApiOperation({ summary: "Confirm mock payment" })
@@ -117,6 +124,7 @@ export class TenantPackageController {
     );
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.UPDATE)
   @Patch("subscription/cancel")
   @ApiOperation({ summary: "Cancel current subscription" })
@@ -127,6 +135,7 @@ export class TenantPackageController {
     return this.packages.cancelSubscription(this.getTenantId(currentUser), dto);
   }
 
+  @ApiBearerAuth()
   @RequirePermission(RbacFeature.PACKAGE_MANAGEMENT, PermissionAction.DELETE)
   @Delete("subscription/addons/:subscriptionAddonId")
   @ApiOperation({ summary: "Remove subscription add-on" })
