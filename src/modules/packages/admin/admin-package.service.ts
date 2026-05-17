@@ -34,6 +34,11 @@ import { PackageSubscriptionService } from "../package-subscription.service";
 
 const PACKAGE_PLAN_INCLUDE = {
   limits: true,
+  features: {
+    orderBy: {
+      sortOrder: "asc",
+    },
+  },
   _count: {
     select: {
       subscriptions: true,
@@ -74,16 +79,8 @@ export class AdminPackageService {
             isDefault: dto.isDefault ?? false,
             status: dto.status ?? PackageStatus.ACTIVE,
             sortOrder: dto.sortOrder ?? 0,
-            limits: dto.limits?.length
-              ? {
-                  create: dto.limits.map((limit) => ({
-                    limitKey: limit.limitKey,
-                    limitValue: limit.limitValue,
-                    resetCycle: limit.resetCycle,
-                    description: limit.description?.trim() || null,
-                  })),
-                }
-              : undefined,
+            limits: this.buildLimitCreate(dto.limits),
+            features: this.buildFeatureCreate(dto.features),
           },
           include: PACKAGE_PLAN_INCLUDE,
         });
@@ -175,6 +172,14 @@ export class AdminPackageService {
           });
         }
 
+        if (dto.features !== undefined) {
+          await tx.packagePlanFeature.deleteMany({
+            where: {
+              packageId: planId,
+            },
+          });
+        }
+
         return tx.packagePlan.update({
           where: {
             id: planId,
@@ -198,14 +203,10 @@ export class AdminPackageService {
             ...(dto.status !== undefined && { status: dto.status }),
             ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
             ...(dto.limits !== undefined && {
-              limits: {
-                create: dto.limits.map((limit) => ({
-                  limitKey: limit.limitKey,
-                  limitValue: limit.limitValue,
-                  resetCycle: limit.resetCycle,
-                  description: limit.description?.trim() || null,
-                })),
-              },
+              limits: this.buildLimitCreate(dto.limits),
+            }),
+            ...(dto.features !== undefined && {
+              features: this.buildFeatureCreate(dto.features),
             }),
           },
           include: PACKAGE_PLAN_INCLUDE,
@@ -401,7 +402,16 @@ export class AdminPackageService {
               status: true,
             },
           },
-          package: true,
+          package: {
+            include: {
+              features: {
+                orderBy: {
+                  sortOrder: "asc",
+                },
+              },
+              limits: true,
+            },
+          },
           addons: {
             include: {
               addon: true,
@@ -440,6 +450,11 @@ export class AdminPackageService {
         package: {
           include: {
             limits: true,
+            features: {
+              orderBy: {
+                sortOrder: "asc",
+              },
+            },
           },
         },
         addons: {
@@ -584,6 +599,32 @@ export class AdminPackageService {
         isDefault: false,
       },
     });
+  }
+
+  private buildLimitCreate(limits?: CreatePackagePlanDto["limits"]) {
+    return limits?.length
+      ? {
+          create: limits.map((limit) => ({
+            limitKey: limit.limitKey,
+            limitValue: limit.limitValue,
+            resetCycle: limit.resetCycle,
+            description: limit.description?.trim() || null,
+          })),
+        }
+      : undefined;
+  }
+
+  private buildFeatureCreate(features?: CreatePackagePlanDto["features"]) {
+    return features?.length
+      ? {
+          create: features.map((feature, index) => ({
+            title: feature.title.trim(),
+            description: feature.description?.trim() || null,
+            sortOrder: feature.sortOrder ?? index,
+            isActive: feature.isActive ?? true,
+          })),
+        }
+      : undefined;
   }
 
   private normalizeCurrency(currencyCode?: string) {

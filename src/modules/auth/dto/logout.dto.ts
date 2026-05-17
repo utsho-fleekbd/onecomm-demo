@@ -4,5 +4,5 @@ import { ApiProperty } from "@nestjs/swagger";
 export class LogoutDto {
   @ApiProperty({ example: "refresh-token" })
   @IsString()
-  declare refreshToken: string;
+  refreshToken!: string;
 }

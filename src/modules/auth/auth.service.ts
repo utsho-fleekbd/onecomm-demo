@@ -59,6 +59,8 @@ const ACCESSIBLE_BUSINESS_STATUSES = [
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger("Auth");
+  private readonly otpMaxAttempt: number;
+  private readonly optExpiresIn: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -67,7 +69,12 @@ export class AuthService {
     private readonly businessService: BusinessService,
     private readonly packageSubscriptions: PackageSubscriptionService,
     private readonly mailService: MailService,
-  ) {}
+  ) {
+    this.otpMaxAttempt = configService.getOrThrow<number>("OTP_MAX_ATTEMPT");
+    this.optExpiresIn = this.configService.getOrThrow<number>(
+      "OTP_EXPIRES_IN_MINS",
+    );
+  }
 
   async register(dto: RegisterDto) {
     const email = this.normalizeEmail(dto.email);
@@ -103,15 +110,7 @@ export class AuthService {
           status: SystemUserStatus.INACTIVE,
           type: SystemUserType.TENANT,
           emailVerifiedAt: null,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          type: true,
-          status: true,
-          emailVerifiedAt: true,
-          createdAt: true,
+          profile: { create: {} },
         },
       });
 
@@ -138,7 +137,7 @@ export class AuthService {
         .then((res) => res.data);
 
       return {
-        user,
+        user: this.toSafeUser(user),
         selectedBusiness,
       };
     });
@@ -192,7 +191,7 @@ export class AuthService {
       throw new BadRequestException("OTP is invalid or has been expired.");
     }
 
-    if (verification.attemptCount >= 5) {
+    if (verification.attemptCount >= this.otpMaxAttempt) {
       throw new BadRequestException(
         "Too many attempts. Please request a new OTP",
       );
@@ -344,7 +343,12 @@ export class AuthService {
     }
 
     this.assertActiveUser(user);
-    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
+    // TODO: before removing this line completely, check if everything checks for it or not.
+    // await this.packageSubscriptions.assertTenantSubscriptionActive(user);
+    const activeSubscription =
+      await this.packageSubscriptions.findCurrentSubscription(
+        user.tenantId ?? user.id,
+      );
 
     const safeUser = this.toSafeUser(user);
 
@@ -355,11 +359,15 @@ export class AuthService {
         businessId: null,
       });
 
-      return apiResponse({
-        ...tokens,
-        selectedBusiness: null,
-        user: safeUser,
-      });
+      return apiResponse(
+        {
+          ...tokens,
+          selectedBusiness: null,
+          activeSubscription,
+          user: safeUser,
+        },
+        "Authenticated.",
+      );
     }
 
     const businesses = await this.findAccessibleBusinesses(user.id);
@@ -381,6 +389,7 @@ export class AuthService {
         ...tokens,
         selectedBusiness,
         businesses,
+        activeSubscription,
         user: safeUser,
       },
       "Authenticated.",
@@ -748,7 +757,7 @@ export class AuthService {
       throw new BadRequestException("OTP is invalid or has been expired.");
     }
 
-    if (resetRecord.attemptCount >= 5) {
+    if (resetRecord.attemptCount >= this.otpMaxAttempt) {
       throw new BadRequestException(
         "Too many attempts. Please request a new OTP.",
       );
@@ -831,7 +840,7 @@ export class AuthService {
     const newPasswordHash = await this.hashPassword(dto.newPassword);
 
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+    expiresAt.setMinutes(expiresAt.getMinutes() + this.optExpiresIn);
 
     const updatedUser = await this.prisma.systemUser.update({
       where: {
@@ -985,17 +994,19 @@ export class AuthService {
     });
   }
 
-  async me(user: CurrentUserPayload) {
-    await this.packageSubscriptions.assertTenantSubscriptionActive(user);
-
+  async getUser(user: CurrentUserPayload) {
     if (user.type === SystemUserType.ADMIN) {
       return apiResponse({
         user,
-        selectedBusiness: null,
       });
     }
 
     const businesses = await this.findAccessibleBusinesses(user.id);
+
+    const activeSubscription =
+      await this.packageSubscriptions.findCurrentSubscription(
+        user.tenantId ?? user.id,
+      );
 
     const profile = await this.prisma.systemUserProfile.findFirst({
       where: { userId: user.id },
@@ -1021,6 +1032,7 @@ export class AuthService {
     return apiResponse({
       user,
       profile,
+      activeSubscription,
       selectedBusiness,
       businesses,
     });
@@ -1123,7 +1135,7 @@ export class AuthService {
 
   private getOtpExpiresAt() {
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+    expiresAt.setMinutes(expiresAt.getMinutes() + this.optExpiresIn);
 
     return expiresAt;
   }
@@ -1338,7 +1350,7 @@ export class AuthService {
   }
 
   private toSafeUser(user: SystemUser): SafeSystemUser {
-    const { ...safeUser } = user;
+    const { passwordHash, ...safeUser } = user;
     return safeUser;
   }
 

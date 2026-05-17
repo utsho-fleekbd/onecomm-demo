@@ -28,6 +28,14 @@ export const PACKAGE_SUBSCRIPTION_INCLUDE = {
   package: {
     include: {
       limits: true,
+      features: {
+        where: {
+          isActive: true,
+        },
+        orderBy: {
+          sortOrder: "asc",
+        },
+      },
     },
   },
   addons: {

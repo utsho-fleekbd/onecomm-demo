@@ -20,7 +20,7 @@ export class CreateRoleDto {
   @IsString()
   @MinLength(2)
   @MaxLength(100)
-  declare name: string;
+  name!: string;
 
   @ApiPropertyOptional({
     example: "Can manage products, orders, and employees.",

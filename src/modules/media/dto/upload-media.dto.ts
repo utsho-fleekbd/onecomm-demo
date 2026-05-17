@@ -8,7 +8,7 @@ export class UploadMediaDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)
-  declare altText?: string;
+  altText?: string;
 
   @ApiPropertyOptional({
     example: "hero,banner,homepage",
@@ -16,5 +16,5 @@ export class UploadMediaDto {
   })
   @IsOptional()
   @IsString()
-  declare tags?: string;
+  tags?: string;
 }

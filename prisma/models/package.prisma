@@ -75,6 +75,7 @@ model PackagePlan {
   deletedAt     DateTime?           @map("deleted_at")
 
   limits        PackagePlanLimit[]
+  features      PackagePlanFeature[]
   subscriptions PackageSubscription[]
   mockPayments  PackageMockPayment[]
 
@@ -82,6 +83,24 @@ model PackagePlan {
   @@index([isDefault])
   @@index([status])
   @@map("package_plans")
+}
+
+model PackagePlanFeature {
+  id          String      @id @default(uuid()) @db.Uuid
+  packageId   String      @map("package_id") @db.Uuid
+  title       String      @db.VarChar(255)
+  description String?
+  sortOrder   Int         @default(0) @map("sort_order")
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  package     PackagePlan @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@index([packageId, sortOrder])
+  @@index([isActive])
+  @@map("package_plan_features")
 }
 
 model PackagePlanLimit {
@@ -229,3 +248,4 @@ model PackageMockPayment {
   @@index([expiresAt])
   @@map("package_mock_payments")
 }
+

@@ -5,5 +5,5 @@ export class ForgotPasswordDto {
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @MaxLength(150)
-  declare email: string;
+  email!: string;
 }

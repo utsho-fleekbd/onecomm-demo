@@ -22,23 +22,23 @@ export class CreateEmployeeDto {
   @IsString()
   @MinLength(2)
   @MaxLength(150)
-  declare name: string;
+  name!: string;
 
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @MaxLength(255)
-  declare email: string;
+  email!: string;
 
   @ApiPropertyOptional({ example: "+8801711111111" })
   @IsOptional()
   @IsPhoneNumber()
   @MaxLength(30)
-  declare phone?: string;
+  phone?: string;
 
   @ApiProperty({ example: "Password@123" })
   @IsString()
   @MinLength(8)
-  declare password: string;
+  password!: string;
 
   @ApiPropertyOptional({
     enum: SystemUserStatus,

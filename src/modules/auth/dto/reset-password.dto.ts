@@ -5,10 +5,10 @@ export class ResetPasswordDto {
   @ApiProperty({ example: "Password@123" })
   @IsString()
   @MinLength(6)
-  declare oldPassword: string;
+  oldPassword!: string;
 
   @ApiProperty({ example: "Password@123" })
   @IsString()
   @MinLength(6)
-  declare newPassword: string;
+  newPassword!: string;
 }

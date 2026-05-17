@@ -9,7 +9,7 @@ export class QueryMediaDto {
   })
   @IsOptional()
   @IsString()
-  declare tags?: string;
+  tags?: string;
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()

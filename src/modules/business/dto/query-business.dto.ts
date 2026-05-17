@@ -16,22 +16,22 @@ export class QueryBusinessDto {
   @ApiPropertyOptional({ example: "business" })
   @IsOptional()
   @IsString()
-  declare search?: string;
+  search?: string;
 
   @ApiPropertyOptional({ enum: BusinessStatus })
   @IsOptional()
   @IsEnum(BusinessStatus)
-  declare status?: BusinessStatus;
+  status?: BusinessStatus;
 
   @ApiPropertyOptional({ example: "BDT" })
   @IsOptional()
   @IsString()
-  declare currencyCode?: string;
+  currencyCode?: string;
 
   @ApiPropertyOptional({ example: "Bangladesh" })
   @IsOptional()
   @IsString()
-  declare country?: string;
+  country?: string;
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()
