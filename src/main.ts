@@ -11,6 +11,7 @@ async function bootstrap() {
     bufferLogs: true,
     logger: ["error", "warn", "log", "debug", "verbose"],
   });
+
   const uploadRoot = process.env.MEDIA_UPLOAD_ROOT!;
   const publicUploadPrefix = process.env.PUBLIC_UPLOAD_PREFIX!;
 
