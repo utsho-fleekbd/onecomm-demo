@@ -41,8 +41,6 @@ import type { CurrentUserPayload } from "./decorators/current-user.decorator";
 import { PackageSubscriptionService } from "../packages/package-subscription.service";
 import { RequestEmailChangeOrVerificationDto } from "./dto/request-email-change-or-verification.dto";
 
-type SafeSystemUser = Omit<SystemUser, "passwordHash">;
-
 type AuthBusiness = {
   id: string;
   ownerUserId: string;
@@ -145,7 +143,14 @@ export class AuthService {
       };
     });
 
-    await this.mailService.sendEmailVerificationOtp(email, otp);
+    void this.mailService
+      .sendEmailVerificationOtp(email, otp)
+      .catch((error) => {
+        this.logger.error(
+          `Failed to send verification email to ${email}`,
+          error,
+        );
+      });
 
     return apiResponse(
       data,
@@ -464,7 +469,14 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendChangeEmailOtpEmail(newEmail, otp);
+    void this.mailService
+      .sendChangeEmailOtpEmail(newEmail, otp)
+      .catch((error) => {
+        this.logger.error(
+          `Failed to send verification email to ${newEmail}`,
+          error,
+        );
+      });
 
     return apiResponse(
       {
@@ -613,7 +625,14 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendForgotPasswordOtpEmail(email, otp);
+    void this.mailService
+      .sendForgotPasswordOtpEmail(email, otp)
+      .catch((error) => {
+        this.logger.error(
+          `Failed to send verification email to ${email}`,
+          error,
+        );
+      });
 
     return apiResponse(
       { success: true },
