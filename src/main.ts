@@ -36,8 +36,8 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle("Onecomm API")
-    .setDescription("Onecomm backend API")
+    .setTitle("Onecomm")
+    .setDescription("Onecomm API")
     .setVersion("1.0")
     .addBearerAuth({
       type: "http",

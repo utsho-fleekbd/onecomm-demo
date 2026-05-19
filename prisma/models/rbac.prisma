@@ -55,7 +55,6 @@ model RbacRole {
   permissions  RbacRolePermission[]
   userRoleMaps RbacUserRoleMap[]
 
-  @@unique([businessId, name])
   @@index([businessId])
   @@index([status])
   @@index([deletedAt])
